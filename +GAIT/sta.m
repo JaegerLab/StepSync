@@ -81,7 +81,7 @@ elseif random_method == 2
     random_std = std(emg(random_range));
 elseif random_method ==3
     % === randomly shift real event time =======
-    rep = 40;
+    rep = 100;
     random_sta = zeros(2*max_lag*sample_rate+1, rep);
     % disp('randomized control repitition:')
     for kk=1:rep

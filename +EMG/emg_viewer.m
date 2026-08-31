@@ -2,9 +2,6 @@ function fig = emg_viewer(default_path)
     % App state
     data = shared.SessionData.instance();
     
-    hd = struct();
-
-    
     drawGUI(default_path);
 
     function drawGUI(default_path)
@@ -34,7 +31,7 @@ function fig = emg_viewer(default_path)
             uibutton(subgrid1, 'Text', 'Pre-Process', 'ButtonPushedFcn', @preprocess);
             hd.datatype = uidropdown(subgrid1, "Items", "Raw", "ValueChangedFcn", @typeChanged);
 
-        uibutton(grid1, 'Text', 'Load Channel Map', 'ButtonPushedFcn', @(src,evt)loadChannelMap(true)); %true = sort muscles
+        uibutton(grid1, 'Text', 'Load Channel Map', 'ButtonPushedFcn', @(src,evt)loadChannelMap()); 
     
         %% Row 3: Listbox + Axes
         hd.ax = uiaxes(grid1);
@@ -44,9 +41,17 @@ function fig = emg_viewer(default_path)
         xlabel(hd.ax, 'Time (s)'); ylabel(hd.ax, 'Voltage');
         disableDefaultInteractivity(hd.ax)
     
-        hd.chanList = uilistbox(grid1, 'Multiselect', 'off', ...
-            'ValueChangedFcn', @(src,evt)updatePlots());
-        hd.chanList.Layout.Row = 3; hd.chanList.Layout.Column = 2;
+        subgrid3 = uigridlayout(grid1, [2 1], Padding=[0 0 0 0], ...
+            RowHeight={'1x', 30});
+        subgrid3.Layout.Row = 3; subgrid3.Layout.Column = 2;
+            hd.chanList = uilistbox(subgrid3, 'Multiselect', 'off', ...
+                'ValueChangedFcn', @(src,evt)updatePlots());
+            subgrid4 = uigridlayout(subgrid3, [1 2], Padding = [0 0 0 0], ...
+                        ColumnWidth ={50, '1x'});
+            uilabel(subgrid4, 'Text', 'Sort by:');
+            hd.sortby = uidropdown(subgrid4, 'Enable', 'off', ...
+                "Items",["Channel", "Muscle"], 'ValueChangedFcn', @(src,evt)sortChannelMap());
+        
 
         %% Row 4: zoom in, zoom out, update buttons
         subgrid2 = uigridlayout(grid1, [1 3], 'Padding', [0 0 0 0]);
@@ -65,39 +70,31 @@ function fig = emg_viewer(default_path)
 
     %% === Load EMG the first time === %%
     function openEMG(~, ~)
+        hd = data.emg.hd;
         % open file----------------
-        default_file = hd.path.Value;
-        if isempty(default_file)
-            default_file='*.rhd';
-        else
-            [pathname, file, ext] = fileparts(default_file);
-            if isempty(ext)
-                % the last part is a folder
-                default_file = fullfile(pathname, file, '*.rhd');
-            else
-                % the last part is a file
-                default_file = fullfile(pathname, ['*' ext]);
-            end
-        end
-        [files, path] = uigetfile(default_file, 'Select EMG File(s)', 'MultiSelect', 'on');
-        if isequal(files, 0), return; end
-        if ischar(files), files = {files}; end  % ensure cell
+        % == new UI, select the folder, compatible with Open Ephys ===
+        pathname = uigetdir(hd.path.Value, 'Select the Directory for EMG data files');
+        if isequal(pathname, 0), return; end
 
-        fullPaths = fullfile(path, files);
-        emgData = EMG.read_intan(fullPaths);
+        emgData = EMG.emg_read(pathname);
 
         % Update state ---------------
-        data.emg.filename = fullPaths;
-        data.emg.display_name = [fullPaths{1} ' ~ ' files{end}];
+        data.emg.filename = emgData.files;
+        data.emg.display_name = pathname;
         data.emg.analog_data = emgData.analog_data;
-        data.emg.analog_channels = {emgData.analog_channels.custom_channel_name};
+        data.emg.analog_channels = emgData.analog_channels;
         data.emg.sample_rate = emgData.sample_rate;
         if isfield(emgData, 'dig_in_data')
+            % Intan
             data.emg.trigger.data = emgData.dig_in_data;
+        elseif isfield(emgData, 'trigger')
+            % Open Ephys
+            data.emg.trigger = emgData.trigger;
         end
         data.emg.t = emgData.t;
 
         hd.datatype.Items = "Raw";
+        hd.sortby.Enable = 'off';
 
         updateInfo();
         updatePlots();
@@ -106,14 +103,16 @@ function fig = emg_viewer(default_path)
     % separate reading and updating info, because reading is slow, and
     % data is saved in SessionData. No need to repeat reading for update.
     function updateInfo()
+        if ~data.has('emg'); return; end
+        
+        hd = data.emg.hd;
         % trigger time
         if isfield(data.emg, 'trigger')
-            data.emg.trigger.time = data.emg.t(1 + find(diff(data.emg.trigger.data)>0.5));
+            if ~isfield(data.emg.trigger, 'time')
+                data.emg.trigger.time = data.emg.t(1 + find(diff(data.emg.trigger.data)>0.5));
+            end
             data.emg.trigger.freq = 1/median(diff(data.emg.trigger.time));
             data.emg.trigger.number = length(data.emg.trigger.time);
-            if data.has('dlc')
-                data.dlc.hd.frameRate = data.emg.trigger.freq;
-            end
         end
 
         % Update UI -------------------
@@ -128,24 +127,23 @@ function fig = emg_viewer(default_path)
     end
 
     function pushFrameRate(~,~)
+        data.frameRate = data.emg.trigger.freq;
         notify(data, 'InfoChanged');
     end
 
     %% main update
     function updatePlots()
+        if ~data.has('emg'); return; end
+
+        hd = data.emg.hd;
         channels = hd.chanList.Value;
         
         % raw plot
         if isequal(hd.datatype.Value, "Raw") ||  isfield(data.emg, 'temp')
             t = data.emg.t;
             y = data.emg.analog_data(:,channels);
-            if isfield(hd, 'rawPlot') && ishghandle(hd.rawPlot)
-                hd.rawPlot.XData = t;
-                hd.rawPlot.YData = y;
-                hd.rawPlot.Visible = true;
-            else
-                hd.rawPlot = plot(hd.ax, t, y, 'ButtonDownFcn',@axClicked);
-            end
+            hd = shared.myPlot(@plot, hd, 'rawPlot', ...
+                hd.ax, t, y, 'b-', 'ButtonDownFcn', @axClicked);
         else 
             if isfield(hd, 'rawPlot') && ishghandle(hd.rawPlot)
                 hd.rawPlot.Visible = false;
@@ -155,28 +153,19 @@ function fig = emg_viewer(default_path)
         if isfield(data.emg, 'temp')
             t = data.emg.temp.t;
             y = data.emg.temp.data;
-            if isfield(hd, 'tempPlot') && ishghandle(hd.tempPlot)
-                hd.tempPlot.XData = t;
-                hd.tempPlot.YData = y;
-                hd.tempPlot.Visible = true;
-            else
-                hd.tempPlot = plot(hd.ax, t, y,'ButtonDownFcn',@axClicked);
-            end
+            hd = shared.myPlot(@plot, hd, 'tempPlot', ...
+                hd.ax, t, y, 'y-', 'ButtonDownFcn', @axClicked);
         else
             if isfield(hd, 'tempPlot') && ishghandle(hd.tempPlot)
                 hd.tempPlot.Visible = false;
             end
         end
+        % processed plot
         if isequal(hd.datatype.Value, "Processed") && isfield(data.emg, 'processed')
             t = data.emg.processed.t;
             y = data.emg.processed.data(:,channels);
-            if isfield(hd, 'prosPlot') && ishghandle(hd.prosPlot)
-                hd.prosPlot.XData = t;
-                hd.prosPlot.YData = y;
-                hd.prosPlot.Visible = true;
-            else
-                hd.prosPlot = plot(hd.ax, t, y, 'ButtonDownFcn',@axClicked);
-            end
+            hd = shared.myPlot(@plot, hd, 'prosPlot', ...
+                hd.ax, t, y, 'g-', 'ButtonDownFcn', @axClicked);
         else
             if isfield(hd, 'prosPlot') && ishghandle(hd.prosPlot)
                 hd.prosPlot.Visible = false;
@@ -191,8 +180,9 @@ function fig = emg_viewer(default_path)
         data.emg.hd = hd;
     end
 
-    function loadChannelMap(sort_mapping)
+    function loadChannelMap()
         % get default fileter
+        hd = data.emg.hd;
         default_file = hd.path.Value;
         if isempty(default_file)
             default_file='*.csv';
@@ -207,7 +197,6 @@ function fig = emg_viewer(default_path)
         
         % read channel mapping csv file
         ch_mapping = readtable(filename);
-
         % check if channel number is correct.
         if height(ch_mapping) == size(data.emg.analog_data, 2)
             % mono-pole recording
@@ -218,18 +207,30 @@ function fig = emg_viewer(default_path)
             error('Channel number mismatch');
         end
 
-        % connect columns in the table
-        ch_names = strcat(num2str(ch_mapping.Channel), '_', ...
-                                   ch_mapping.Muscle, '_', ...
-                                   ch_mapping.Note);
-        if sort_mapping
-            [~, orders] = sort(ch_mapping.Muscle);
-        else
-            orders = 1:height(ch_mapping);
-        end
+        % add analog channel name to the mapping table.
+        Analog = data.emg.analog_channels';
+        ch_mapping = addvars(ch_mapping, Analog, 'before', 1);
 
-        % save name in the list
-        hd.chanList.Items = ch_names(orders);
+        % add variable names to the sort by dropdown menu
+        hd.sortby.Items = ch_mapping.Properties.VariableNames;
+        hd.sortby.Enable = 'on';
+
+        % combine table into channel names
+        ch_mapping = convertvars(ch_mapping, @isnumeric, @(x)cellstr(num2str(x)));
+        ch_mapping.Names = join(ch_mapping{:,:}, ', ');        
+        data.emg.ch_mapping = ch_mapping;
+
+        % save channel names in the list
+        hd.chanList.Items = ch_mapping.Names;
+        
+        data.emg.hd = hd;
+        sortChannelMap
+    end
+
+    function sortChannelMap()
+        hd = data.emg.hd;
+        [~, orders] = sort(data.emg.ch_mapping.(hd.sortby.Value));
+        hd.chanList.Items = data.emg.ch_mapping.Names(orders);
         hd.chanList.ItemsData = orders;
     end
 
@@ -238,9 +239,11 @@ function fig = emg_viewer(default_path)
         
         % draw new window where the mouse is
         mousePos = get(0, 'PointerLocation');
-        
+        hd = data.emg.hd;
+
         if ~isfield(hd, 'prepGUI') || ~isgraphics(hd.prepGUI, 'figure')
             hd.prepGUI = EMG.emg_prep_GUI(mousePos);
+            data.emg.hd = hd;
         else
             % if window is already open, don't open another one.
             figure(hd.prepGUI)
@@ -258,23 +261,21 @@ function fig = emg_viewer(default_path)
 
     function updateEMGtime(currentTime)
         if data.has('emg')
-
+            hd = data.emg.hd;
             hd.timeline.Value = currentTime;
-            
             hd.time.Value = currentTime;
-    
             zoomlim = shared.zoom(data.currentZoom, currentTime, 'pan');
             data.setZoom(zoomlim);
         end
     end
 
     function zoomIn(~, ~)
-        zoomlim = shared.zoom(get(hd.ax, 'xLim'), data.currentTime, 'in');
+        zoomlim = shared.zoom(get(data.emg.hd.ax, 'xLim'), data.currentTime, 'in');
         data.setZoom(zoomlim);
     end
 
     function zoomOut(~, ~)
-        zoomlim = shared.zoom(get(hd.ax, 'xLim'), data.currentTime, 'out');
+        zoomlim = shared.zoom(get(data.emg.hd.ax, 'xLim'), data.currentTime, 'out');
         data.setZoom(zoomlim);
     end
 
@@ -283,6 +284,7 @@ function fig = emg_viewer(default_path)
     end
 
     function updateEMGzoom(newZoom)
+        hd = data.emg.hd;
         if data.has('emg')
             newZoom(1)=max([0 newZoom(1)]);
             newZoom(2)=min([newZoom(2), data.emg.t(end)]);
@@ -293,6 +295,7 @@ function fig = emg_viewer(default_path)
 
     % close function
     function onClose(~,~)
+        hd = data.emg.hd;
         % Clear all the handles and plots;
         field = fields(hd);
         for k=1:length(field)
@@ -307,7 +310,8 @@ function fig = emg_viewer(default_path)
 
         % Clear the data
         data.emg = struct();
-    
+        % Clear saved figure handle
+        data.fig = rmfield(data.fig, 'emg');
         delete(fig);  % finally close the GUI
     end
 

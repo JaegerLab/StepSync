@@ -29,6 +29,12 @@ elseif isequal(plotFun, @yline)
     else
         set(hd.(field), "Value", ydata);
     end
+elseif isequal(plotFun, @image)
+    if ~isfield(hd, field) || ~ishghandle(hd.(field))
+        hd.(field) = plotFun(ax, xdata, varargin{:});
+    else
+        set(hd.(field), "CData", xdata);
+    end
 else
     if ~isfield(hd, field) || ~ishghandle(hd.(field))
         hd.(field) = plotFun(ax, xdata, ydata, varargin{:});

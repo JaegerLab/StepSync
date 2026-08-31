@@ -6,7 +6,7 @@ classdef SessionData < handle
         emg struct
         gait struct
 
-        currentFrame double = 0;
+        frameRate double = 0;
         currentTime double = 0;
         currentZoom double = [0 10];
     end
@@ -53,12 +53,9 @@ classdef SessionData < handle
 
         % decide frame rate from different data sources
         function frameRate = getFrameRate(obj)
-            if isfield(obj, 'frameRate')
+            if obj.frameRate~=0
                 % 1st priority, manually corrected frame rate
-                frameRate = obj.video.frameRate;
-            elseif obj.has('dlc') && isfield(obj.dlc, 'frameRate')
-                % manually corrected DLC frame rate
-                frameRate = obj.dlc.frameRate;
+                frameRate = obj.frameRate;
             elseif obj.has('emg')
                 % digital triggers recorded from Intan
                 frameRate = obj.emg.trigger.freq;

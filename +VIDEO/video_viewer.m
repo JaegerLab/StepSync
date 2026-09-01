@@ -267,33 +267,32 @@ end
 
 % if there's DLC, draw the marker on the video
 function drawDLCMarker()
-    if data.has('dlc') 
+    if data.has('dlc')
         hd = data.video.hd;
-        hd_dlc = data.dlc.hd;
         frameIdx = data.video.frameIdx;
+        tabledlc = data.dlc.table;
+        bodypart = data.dlc.hd.list_bodyparts.Value;
 
         % show temp marker
-        if isfield(hd_dlc, 'tempXplot')
+        if ismember('temp_x', tabledlc.Properties.VariableNames)
             hd = shared.myPlot( ...
                 @plot, hd, 'dlcTempMarker', hd.ax, ...
-                hd_dlc.tempXplot.YData(frameIdx), hd_dlc.tempYplot.YData(frameIdx), ...
+                tabledlc.temp_x(frameIdx), tabledlc.temp_y(frameIdx), ...
                 'r+', 'LineWidth', 2, 'HitTest','off');
         end
 
         % show marker
         hd = shared.myPlot(@plot, hd, 'dlcMarker', hd.ax, ...
-                hd_dlc.xplot.YData(frameIdx), hd_dlc.yplot.YData(frameIdx), ...
+                tabledlc.([bodypart '_x'])(frameIdx), tabledlc.([bodypart '_y'])(frameIdx), ...
                 'g+', 'LineWidth', 2, 'HitTest','off');
-        
+
         data.video.hd = hd;
     end
 end
 
 % if there's gait, draw gait landmarks on the video
 function drawGaitMarker()
-    if data.has('gait')
-
-    end
+    % gait marker is implemented in the GAIT.gait_viewer module
 end
 
 % drag the markers ==========================

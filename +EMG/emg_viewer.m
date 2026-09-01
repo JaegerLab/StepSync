@@ -144,6 +144,7 @@ function fig = emg_viewer(default_path)
             y = data.emg.analog_data(:,channels);
             hd = shared.myPlot(@plot, hd, 'rawPlot', ...
                 hd.ax, t, y, 'b-', 'ButtonDownFcn', @axClicked);
+            hd.rawPlot.Visible = true;
         else 
             if isfield(hd, 'rawPlot') && ishghandle(hd.rawPlot)
                 hd.rawPlot.Visible = false;
@@ -155,6 +156,7 @@ function fig = emg_viewer(default_path)
             y = data.emg.temp.data;
             hd = shared.myPlot(@plot, hd, 'tempPlot', ...
                 hd.ax, t, y, 'y-', 'ButtonDownFcn', @axClicked);
+            hd.tempPlot.Visible = true;
         else
             if isfield(hd, 'tempPlot') && ishghandle(hd.tempPlot)
                 hd.tempPlot.Visible = false;
@@ -166,6 +168,7 @@ function fig = emg_viewer(default_path)
             y = data.emg.processed.data(:,channels);
             hd = shared.myPlot(@plot, hd, 'prosPlot', ...
                 hd.ax, t, y, 'g-', 'ButtonDownFcn', @axClicked);
+            hd.prosPlot.Visible = true;
         else
             if isfield(hd, 'prosPlot') && ishghandle(hd.prosPlot)
                 hd.prosPlot.Visible = false;

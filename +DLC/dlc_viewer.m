@@ -375,9 +375,11 @@ function fig = dlc_viewer(default_path)
         if data.has('video')
             if isfield(data.video.hd, 'dlcMarker')
                 delete(data.video.hd.dlcMarker)
+                data.video.hd = rmfield(data.video.hd, 'dlcMarker');
             end
             if isfield(data.video.hd, 'dlcTempMarker')
                 delete(data.video.hd.dlcTempMarker)
+                data.video.hd = rmfield(data.video.hd, 'dlcTempMarker');
             end
         end
         % Clear all the handles and plots;

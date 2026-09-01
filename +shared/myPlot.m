@@ -16,6 +16,14 @@ if nargin < 7
     varargin = {};
 end
 
+% clean up any orphaned duplicate before making a new one
+if ~isfield(hd, field) || ~ishghandle(hd.(field))
+    stale = findobj(ax, 'Tag', field, '-depth', 1);
+    if ~isempty(stale)
+        delete(stale);   
+    end
+end
+
 % check what kind of plot it is
 if isequal(plotFun, @xline)
     if ~isfield(hd, field) || ~ishghandle(hd.(field))

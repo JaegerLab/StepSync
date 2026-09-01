@@ -124,9 +124,9 @@ function fig = DLC_fix_GUI(mousePos)
         end
 
         % remove temp marker drawn in video viewer
-        if isfield(data.dlc.hd, 'videoTempMarker')
-            delete(data.dlc.hd.videoTempMarker)
-            data.dlc.hd = rmfield(data.dlc.hd, 'videoTempMarker');
+        if data.has('video') && isfield(data.video.hd, 'dlcTempMarker')
+            delete(data.video.hd.dlcTempMarker)
+            data.video.hd = rmfield(data.video.hd, 'dlcTempMarker');
         end
     end
 

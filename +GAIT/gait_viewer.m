@@ -1,12 +1,10 @@
 function fig = gait_viewer(default_path)
 
     data = shared.SessionData.instance();
-    hd = struct;
     drawGUI(default_path)
-    data.gait(1).hd = hd;
     
     function drawGUI(default_path)
-    
+        hd = struct;
         % gait viewer window with uigridlayout
         fig = uifigure('Name', 'Gait Viewer', 'Position', [100 100 1000 400], ...
             'CloseRequestFcn',@onClose);
@@ -29,7 +27,8 @@ function fig = gait_viewer(default_path)
         hd.frameRate = uieditfield(subgrid1,'numeric','Value',1, ...
             'ValueDisplayFormat','Frame rate: %.2f Hz');
         hd.resolution = uieditfield(subgrid1,'numeric','Value',30, ...
-            'ValueDisplayFormat','Resolution: %d px/cm');
+            'ValueDisplayFormat','Resolution: %d px/cm', ...
+            'ValueChangedFcn', @updateInfo);
         hd.pawthresh = uieditfield(subgrid1,'numeric','Value',10, ...
             'ValueDisplayFormat','Paw thresh: %.2f cm/s', ...
             'ValueChangedFcn', @pawThreshChanged);
@@ -75,6 +74,7 @@ function fig = gait_viewer(default_path)
     end
 
     function importPaws(~,~)
+        hd = data.gait.hd;
         if ~data.has('dlc')
             % read dlc from file.
             filename = hd.path.Value;
@@ -116,10 +116,12 @@ function fig = gait_viewer(default_path)
 
         getSpeeds();
         plotTraces();
-        gaitAnalysis();
+        getPOIs();
+        plotPOIs();
     end
 
     function getSpeeds()
+        hd = data.gait.hd;
         hd.frameRate.Value = data.getFrameRate;
         data.gait.speedFactor = hd.frameRate.Value / hd.resolution.Value;
 
@@ -136,6 +138,7 @@ function fig = gait_viewer(default_path)
     end
    
     function plotTraces()
+        hd = data.gait.hd;
         hold(hd.ax, 'on');
         data.gait.t = data.dlc.t;
 
@@ -152,7 +155,8 @@ function fig = gait_viewer(default_path)
         end
         data.gait.paw(pawIdx).trace = trace;
         data.gait.paw(pawIdx).traceType = hd.trace.Value;
-        % paw speed masked
+
+        % get masked
         if isfield(data.gait, 'maskTemp')
             mask = data.gait.maskTemp;
         elseif isfield(data.gait, 'mask')
@@ -193,11 +197,12 @@ function fig = gait_viewer(default_path)
     end
 
     function getPOIs()
+        hd = data.gait.hd;
         pawthres = hd.pawthresh.Value;
 
         MinTimeInterval = round(hd.minTimeInterval.Value*data.getFrameRate());
         MaxRestingSpeed = 2.5;
-        MaxSpeedLimit = 50;
+        % MaxSpeedLimit = 50;
 
         for ii = 1:numel(data.gait.paw)
             trace = data.gait.paw(ii).trace;
@@ -264,6 +269,7 @@ function fig = gait_viewer(default_path)
     end
 
     function plotPOIs()
+        hd = data.gait.hd;
         if hd.poiCheck.Value && isequal(hd.poiCheck.Enable, 'on')
             % paw POIs
             pawIdx = hd.pawList.Value;
@@ -307,6 +313,7 @@ function fig = gait_viewer(default_path)
     end
 
     function openMask(~,~)
+        hd = data.gait.hd;
         % draw new window where the mouse is
         mousePos = get(0, 'PointerLocation');
         hd = data.gait.hd;
@@ -320,6 +327,7 @@ function fig = gait_viewer(default_path)
     end
 
     function traceChanged(src,~)
+        hd = data.gait.hd;
         switch src.Value
             case 'X'
                 ylabel(hd.ax, 'X (cm)')
@@ -333,6 +341,7 @@ function fig = gait_viewer(default_path)
     end
 
     function autoThresh()
+        hd = data.gait.hd;
         pawIdx = hd.pawList.Value;
         hd.pawthresh.Value = mean(data.gait.paw(pawIdx).trace);
     end
@@ -340,8 +349,8 @@ function fig = gait_viewer(default_path)
     function updateInfo()
         getSpeeds()
         plotTraces()
-        % gaitAnalysis()
-        % plotPOIs()
+        getPOIs()
+        plotPOIs()
     end
 
     function gaitAnalysis()
@@ -351,6 +360,7 @@ function fig = gait_viewer(default_path)
     end
 
     function plotSTA(~,~)
+        hd = data.gait.hd;
         if ~data.has('emg')
             uialert(fig, 'Requires EMG', 'Error');
             return;
@@ -398,9 +408,11 @@ function fig = gait_viewer(default_path)
     end
 
     function pawThreshChanged(~,~)
-        hd = shared.myPlot(@yline, hd, 'pawThresLine', hd.ax, ...
+        hd = data.gait.hd;
+        data.gait.hd = shared.myPlot(@yline, hd, 'pawThresLine', hd.ax, ...
                         [], hd.pawthresh.Value, ...
                         'b:', 'HitTest', 'off');
+        
         gaitAnalysis();
     end
 
@@ -409,6 +421,7 @@ function fig = gait_viewer(default_path)
     end
 
     function poiCheckChanged(src,~)
+        hd = data.gait.hd;
         handles = {'poiGait','poiEMG','poiXDLC','poiYDLC','poiVideo'};
         for k=1:numel(handles)
             if isfield(hd, handles{k}) && ishghandle(hd.(handles{k}))
@@ -426,6 +439,7 @@ function fig = gait_viewer(default_path)
     end
     
     function updateGaitTime(currentTime)
+        hd = data.gait.hd;
         if data.has('gait')
             set(hd.timeline, 'Value', currentTime);
     
@@ -439,6 +453,7 @@ function fig = gait_viewer(default_path)
     end
 
     function updateVideoMarker(currentTime)
+        hd = data.gait.hd;
         if isfield(hd, 'poiVideo') && ishghandle(hd.poiVideo)
             poiIdx = data.gait.paw(hd.pawList.Value).(hd.poiList.Value);
             poiT = data.gait.t(poiIdx);
@@ -448,11 +463,13 @@ function fig = gait_viewer(default_path)
     end
     
     function zoomIn(~, ~)
+        hd = data.gait.hd;
         zoomlim = shared.zoom(get(hd.ax,'xLim'), data.currentTime, 'in');
         data.setZoom(zoomlim);
     end
     
     function zoomOut(~, ~)
+        hd = data.gait.hd;
         zoomlim = shared.zoom(get(hd.ax,'xLim'), data.currentTime, 'out');
         data.setZoom(zoomlim);
     end
@@ -462,6 +479,7 @@ function fig = gait_viewer(default_path)
     end
     
     function updateGaitZoom(newZoom)
+        hd = data.gait.hd;
         if data.has('gait')
             newZoom(1) = max([0 newZoom(1)]);
             newZoom(2) = min([newZoom(2) data.gait.t(end)]);
@@ -472,7 +490,7 @@ function fig = gait_viewer(default_path)
     
     % close function =================================
     function onClose(src,~)
-        
+        hd = data.gait.hd;
         % Clear all the handles and plots;
         field = fields(hd);
         for k=1:length(field)

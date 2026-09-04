@@ -27,25 +27,25 @@ end
 % check what kind of plot it is
 if isequal(plotFun, @xline)
     if ~isfield(hd, field) || ~ishghandle(hd.(field))
-        hd.(field) = plotFun(ax, xdata, 'Tag', field, varargin{:});
+        hd.(field) = plotFun(ax, xdata, varargin{:}, 'Tag', field);
     else
         set(hd.(field), "Value", xdata);
     end
 elseif isequal(plotFun, @yline)
     if ~isfield(hd, field) || ~ishghandle(hd.(field))
-        hd.(field) = plotFun(ax, ydata, 'Tag', field, varargin{:});
+        hd.(field) = plotFun(ax, ydata,  varargin{:}, 'Tag', field);
     else
         set(hd.(field), "Value", ydata);
     end
 elseif isequal(plotFun, @image)
     if ~isfield(hd, field) || ~ishghandle(hd.(field))
-        hd.(field) = plotFun(ax, xdata, 'Tag', field, varargin{:});
+        hd.(field) = plotFun(ax, xdata, varargin{:}, 'Tag', field);
     else
         set(hd.(field), "CData", xdata);
     end
 else
     if ~isfield(hd, field) || ~ishghandle(hd.(field))
-        hd.(field) = plotFun(ax, xdata, ydata, 'Tag', field, varargin{:});
+        hd.(field) = plotFun(ax, xdata, ydata, varargin{:}, 'Tag', field);
     else
         set(hd.(field), "XData", xdata, "YData", ydata);
     end

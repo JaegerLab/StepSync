@@ -331,6 +331,7 @@ function fig = dlc_viewer(default_path)
             hd = shared.myPlot(@xline, hd, 'timeline_dlc', hd.ax, ...
                 data.currentTime,  'k', ...
                 'HitTest', 'off', 'HandleVisibility', 'off');
+            uistack(hd.timeline_dlc, "bottom");
             data.setTime(currentTime);
     
             zoomlim = shared.zoom(get(hd.ax,'xLim'), currentTime, 'pan');

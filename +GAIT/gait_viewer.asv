@@ -310,6 +310,7 @@ function fig = gait_viewer(default_path)
             if data.has('video') 
                 hd = shared.myPlot(@scatter, hd, 'poiVideo', data.video.hd.ax, ...
                                 poiX, poiY, linespec{:});
+                uistack(hd.poiVideo, "top")
                 timeWindow = 1;
                 alpha(hd.poiVideo, 2./(1 + exp(abs(poiT-data.currentTime)/timeWindow)));
             end

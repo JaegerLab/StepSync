@@ -154,6 +154,7 @@ function updateVideoFrame(newFrameIdx)
     end
     
     hd = shared.myPlot(@image, hd, 'image', hd.ax, CData);
+    uistack(hd.image, "bottom")
     frameIdx = newFrameIdx;
 
     % update Time, Frame, and slider
@@ -285,7 +286,7 @@ function drawDLCMarker()
         hd = shared.myPlot(@plot, hd, 'dlcMarker', hd.ax, ...
                 tabledlc.([bodypart '_x'])(frameIdx), tabledlc.([bodypart '_y'])(frameIdx), ...
                 'g+', 'LineWidth', 2, 'HitTest','off');
-
+        uistack(hd.dlcMarker, "top")
         data.video.hd = hd;
     end
 end

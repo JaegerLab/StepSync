@@ -161,7 +161,7 @@ function hfig = StepSync(default_path)
         for k = 1:length(fields)
             field = fields{k};
             if isgraphics(hd.(field))
-                % get fields that are settable and not in the black list
+                % get fields that are settable and in the props
                 settableProps = fieldnames(set(hd.(field)));
                 fieldsToKeep = intersect(settableProps, props);
                 propCell = get(hd.(field), fieldsToKeep);
@@ -176,13 +176,6 @@ function hfig = StepSync(default_path)
         for k = 1:length(fields)
             field = fields{k};
             if isfield(hd, field) && isgraphics(hd.(field))
-                % % 1. Get the properties that the current target handle allows you to set
-                % allowedProps = fieldnames(hd.(field));
-                % % 2. Keep only the fields from the saved struct that the target can accept
-                % validFields = intersect(fieldnames(param.(field)), allowedProps);
-                % % 3. Filter the structure using R2023a's native 'keepfields'
-                % cleanStruct = keepfields(param.(field), validFields);
-                % % 4. Bulk apply the structure properties to the UI target
                 set(hd.(field), param.(field));
             end
         end

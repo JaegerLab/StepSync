@@ -310,7 +310,6 @@ function fig = gait_viewer(default_path)
             if data.has('video') 
                 hd = shared.myPlot(@scatter, hd, 'poiVideo', data.video.hd.ax, ...
                                 poiX, poiY, linespec{:});
-                uistack(hd.poiVideo, "top")
                 timeWindow = 1;
                 alpha(hd.poiVideo, 2./(1 + exp(abs(poiT-data.currentTime)/timeWindow)));
             end
@@ -484,6 +483,34 @@ function fig = gait_viewer(default_path)
     
     function axZoomChanged(src,~)
         data.setZoom(src.Limits);
+    end
+
+    function saveFig(~,~)
+        [file, path] = uiputfile( ...
+            {'*.fig', 'Matlab figure (*.fig)'; ...
+             '*.png','PNG Image (*.png)'; ...
+             '*.jpg','JPEG Image (*.jpg)'; ...
+             '*.pdf','PDF (*.pdf)'}, ...
+            'Export Axes');
+        
+        if isequal(file,0)
+            return
+        end
+        
+        ax = data.gait.hd.ax;
+        [~, ~, ext] = fileparts(file);
+        if isequal(ext, '.fig')
+            % if save as matlab figurecopy axes to an invisible figure
+            f = figure('Visible','off');
+            ax2 = copyobj(ax, f);
+            ax2.Units = 'normalized';
+            ax2.Position = [0.13 0.11 0.775 0.815];
+            
+            savefig(f, fullfile(path,file));
+            close(f);
+        else
+            exportgraphics(ax, fullfile(path,file), 'Resolution',300);
+        end
     end
     
     function updateGaitZoom(newZoom)

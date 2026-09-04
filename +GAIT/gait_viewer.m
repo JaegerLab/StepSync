@@ -38,7 +38,7 @@ function fig = gait_viewer(default_path)
         
         uibutton(subgrid1, 'Text', 'Edit Mask', 'ButtonPushedFcn', @openMask);
 
-        hd.trace = uidropdown(grid1, 'Items',{'X', 'Y', 'Speed'}, 'Value', 'Speed', ...
+        hd.trace = uidropdown(grid1, 'Items',{'X', 'Y', 'Speed'}, 'Value', 'X', ...
             'ValueChangedFcn', @traceChanged);
 
         
@@ -64,11 +64,12 @@ function fig = gait_viewer(default_path)
                 ButtonPushedFcn=@plotSTA);
 
         %% Row 4: zoom in, zoom out, update buttons
-        subgrid2 = uigridlayout(grid1, [1 3], 'Padding', [0 0 0 0]);
+        subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
         subgrid2.Layout.Row = 4; subgrid2.Layout.Column = 2;
         uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn);
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut);
         uibutton(subgrid2,'Text','⭮','ButtonPushedFcn',@(src,evt)updateInfo());
+        uibutton(subgrid2,'Text','💾','ButtonPushedFcn',@exportAxes);
 
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateGaitTime(src.currentTime));
@@ -106,17 +107,13 @@ function fig = gait_viewer(default_path)
         hd.pawList.Items = part_list(pawIdx); hd.pawList.Enable = 'on';
         hd.pawList.ItemsData = 1:numel(pawIdx);
 
-        % add listeners
-        hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateGaitTime(src.currentTime));
-        hd.zoomListener = addlistener(data, 'ZoomChanged', @(src, evt)updateGaitZoom(src.currentZoom));
-        hd.dataListener = addlistener(data, 'DataChanged', @(~,~)updateInfo());
-        hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)updateInfo());
-
         % enable POIs
         hd.poiCheck.Enable = 'on';
         hd.sta.Enable = 'on';
         hd.poiList.Enable = 'on';
         hd.poiList.Items = {'rising','falling','onset','offset','peak','valley'};
+        hd.poiList.ItemsData = {'rising','falling','onset','offset','peak','valley'};
+        hd.poiList.Value = 'rising';
 
         data.gait.hd = hd;
 
@@ -483,6 +480,33 @@ function fig = gait_viewer(default_path)
     
     function axZoomChanged(src,~)
         data.setZoom(src.Limits);
+    end
+
+    function exportAxes(~,~)
+        [file, path] = uiputfile( ...
+            {'*.fig', 'Matlab figure (*.fig)'; ...
+             '*.png','PNG Image (*.png)'; ...
+             '*.jpg','JPEG Image (*.jpg)'; ...
+             '*.pdf','PDF (*.pdf)'}, ...
+            'Export Axes');
+        
+        if isequal(file,0)
+            return
+        end
+        
+        ax = data.gait.hd.ax;
+        [~, ~, ext] = fileparts(file);
+        if isequal(ext, '.fig')
+            % if save as matlab figure, copy axes to an invisible figure
+            f = figure('Visible','off');
+            ax2 = copyobj(ax, f);
+            ax2.Units = 'normalized';
+            ax2.Position = [0.13 0.11 0.775 0.815];
+            savefig(f, fullfile(path,file));
+            close(f);
+        else
+            exportgraphics(ax, fullfile(path,file), 'Resolution',300);
+        end
     end
     
     function updateGaitZoom(newZoom)

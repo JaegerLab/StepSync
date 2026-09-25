@@ -56,10 +56,15 @@ function fig = dlc_viewer(default_path)
         hd.list_bodyparts.Layout.Row = 3; hd.list_bodyparts.Layout.Column = 2;
     
         %% Row 4:  zoom in, zoom out, update buttons        
-        subgrid2 = uigridlayout(grid1, [1 3], 'Padding', [0 0 0 0]);
-        uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn);
-        uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut);
-        uibutton(subgrid2,'Text','⭮','ButtonPushedFcn',@(src,evt)updateInfo());
+        subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
+        uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn, ...
+            'Tooltip','Zoom in');
+        uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
+            'Tooltip','Zoom out');
+        uibutton(subgrid2,'Text','⭯','ButtonPushedFcn',@(src,evt)updateInfo(), ...
+            'Tooltip','Refresh');
+        uibutton(subgrid2,'Text','[➜','ButtonPushedFcn',@exportAxes, ...
+            'Tooltip','Pop out');
 
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateDLCtime(src.currentTime));
@@ -191,8 +196,8 @@ function fig = dlc_viewer(default_path)
             hd.tempXmask.Visible = src.Value && has_temp;
         end
         if data.has('gait')
-            if isfield(data.gait.hd, 'poiXDLC') && ishghandle(data.gait.hd.poiXDLC)
-                data.gait.hd.poiXDLC.Visible = src.Value && data.gait.hd.poiCheck.Value;
+            if isfield(data.gait.hd, 'stepXDLC') && ishghandle(data.gait.hd.stepXDLC)
+                data.gait.hd.stepXDLC.Visible = src.Value && data.gait.hd.stepCheck.Value;
             end
         end
     end
@@ -207,8 +212,8 @@ function fig = dlc_viewer(default_path)
             hd.tempYmask.Visible = src.Value && has_temp;
         end
         if data.has('gait')
-            if isfield(data.gait.hd, 'poiYDLC') && ishghandle(data.gait.hd.poiYDLC)
-                data.gait.hd.poiYDLC.Visible = src.Value && data.gait.hd.poiCheck.Value;
+            if isfield(data.gait.hd, 'stepYDLC') && ishghandle(data.gait.hd.stepYDLC)
+                data.gait.hd.stepYDLC.Visible = src.Value && data.gait.hd.stepCheck.Value;
             end
         end
     end
@@ -363,6 +368,14 @@ function fig = dlc_viewer(default_path)
             xlim(data.dlc.hd.ax, newZoom);
             data.currentZoom = newZoom;
         end
+    end
+
+    function exportAxes(~,~)        
+        ax = data.dlc.hd.ax;
+        f = figure();
+        ax2 = copyobj(ax, f);
+        ax2.Units = 'normalized';
+        ax2.Position = [0 0 1 1];
     end
 
     % close function =================================

@@ -12,7 +12,7 @@ function sta_GUI(mousePos)
         'CloseRequestFcn', @onClose);
     grid1 = uigridlayout(fig, [4 3]);
 
-    % line 1 - high pass filter
+    % line 1 - parameters
     chkHighPass = uicheckbox(grid1,'Text', 'High Pass', 'Value', 1);
     editHighPass = uieditfield(grid1, 'numeric','Value',500);
     chkFiltFilt = uicheckbox(grid1, 'Text', 'FiltFilt', 'Value', 0);
@@ -23,7 +23,7 @@ function sta_GUI(mousePos)
     % line 3 - smooth and downsample
     chkDownSample = uicheckbox(grid1,'Text', 'Down Sample', 'Value',1, ...
         'Layout', matlab.ui.layout.GridLayoutOptions('Row', 3, 'Column', 1));
-    editDownRate = uieditfield(grid1, 'numeric', 'Value', 200);
+    
 
     % line 4 - buttons: preview, save&close, cancel
     uibutton(grid1, 'Text','Preview', 'ButtonPushedFcn', @preview, ...

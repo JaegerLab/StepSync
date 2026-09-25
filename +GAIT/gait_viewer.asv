@@ -38,7 +38,7 @@ function fig = gait_viewer(default_path)
         
         uibutton(subgrid1, 'Text', 'Edit Mask', 'ButtonPushedFcn', @openMask);
 
-        hd.trace = uidropdown(grid1, 'Items',{'X', 'Y', 'Speed'}, 'Value', 'Speed', ...
+        hd.trace = uidropdown(grid1, 'Items',{'X', 'Y', 'Speed'}, 'Value', 'X', ...
             'ValueChangedFcn', @traceChanged);
 
         
@@ -55,20 +55,21 @@ function fig = gait_viewer(default_path)
         hd.pawList = uilistbox(subgrid3, 'Multiselect', 'off', ...
             'ValueChangedFcn', @pawChanged, 'Enable','off');
         subgrid4 = uigridlayout(subgrid3, [1 2], Padding = [0 0 0 0]);
-            hd.poiCheck = uicheckbox(subgrid4, Text='Steps', Value=1, ...
-                Enable='off', ValueChangedFcn=@poiCheckChanged);
-            hd.poiNum = uieditfield(subgrid4, 'numeric', Value = 0, Editable='off');
-        hd.poiList = uilistbox(subgrid3, 'Multiselect', 'off', ...
-            'ValueChangedFcn', @poiChanged, 'Enable','off');
+            hd.stepCheck = uicheckbox(subgrid4, Text='Steps', Value=1, ...
+                Enable='off', ValueChangedFcn=@stepCheckChanged);
+            hd.stepNum = uieditfield(subgrid4, 'numeric', Value = 0, Editable='off');
+        hd.stepList = uilistbox(subgrid3, 'Multiselect', 'off', ...
+            'ValueChangedFcn', @stepChanged, 'Enable','off');
         hd.sta = uibutton(subgrid3, Text='Step Triggered Avg', Enable='off', ...
                 ButtonPushedFcn=@plotSTA);
 
         %% Row 4: zoom in, zoom out, update buttons
-        subgrid2 = uigridlayout(grid1, [1 3], 'Padding', [0 0 0 0]);
+        subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
         subgrid2.Layout.Row = 4; subgrid2.Layout.Column = 2;
         uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn);
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut);
         uibutton(subgrid2,'Text','⭮','ButtonPushedFcn',@(src,evt)updateInfo());
+        uibutton(subgrid2,'Text','💾','ButtonPushedFcn',@exportAxes);
 
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateGaitTime(src.currentTime));
@@ -106,24 +107,20 @@ function fig = gait_viewer(default_path)
         hd.pawList.Items = part_list(pawIdx); hd.pawList.Enable = 'on';
         hd.pawList.ItemsData = 1:numel(pawIdx);
 
-        % add listeners
-        hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateGaitTime(src.currentTime));
-        hd.zoomListener = addlistener(data, 'ZoomChanged', @(src, evt)updateGaitZoom(src.currentZoom));
-        hd.dataListener = addlistener(data, 'DataChanged', @(~,~)updateInfo());
-        hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)updateInfo());
-
-        % enable POIs
-        hd.poiCheck.Enable = 'on';
+        % enable Steps
+        hd.stepCheck.Enable = 'on';
         hd.sta.Enable = 'on';
-        hd.poiList.Enable = 'on';
-        hd.poiList.Items = {'rising','falling','onset','offset','peak','valley'};
+        hd.stepList.Enable = 'on';
+        hd.stepList.Items = {'rising','falling','onset','offset','peak','valley'};
+        hd.stepList.ItemsData = {'rising','falling','onset','offset','peak','valley'};
+        hd.stepList.Value = 'rising';
 
         data.gait.hd = hd;
 
         getSpeeds();
-        plotTraces();
-        getPOIs();
-        plotPOIs();
+        plotTrace();
+        getSteps();
+        plotSteps();
     end
 
     function getSpeeds()
@@ -140,10 +137,14 @@ function fig = gait_viewer(default_path)
             data.gait.paw(ii).x = x./hd.resolution.Value;
             data.gait.paw(ii).y = y./hd.resolution.Value;
             data.gait.paw(ii).speed = paw_speed;
+
+            traceType = hd.trace.Value;
+            data.gait.paw(ii).trace = data.gait.paw(ii).(lower(traceType));
+            data.gait.paw(ii).traceType = traceType;
         end
     end
    
-    function plotTraces()
+    function plotTrace()
         hd = data.gait.hd;
         hold(hd.ax, 'on');
         data.gait.t = data.dlc.t;
@@ -151,16 +152,7 @@ function fig = gait_viewer(default_path)
         % paw speed
         pawIdx = hd.pawList.Value;
         t = data.gait.t;
-        switch hd.trace.Value
-            case 'X'
-                trace = data.gait.paw(pawIdx).x;
-            case 'Y'
-                trace = data.gait.paw(pawIdx).y;
-            case 'Speed'
-                trace = data.gait.paw(pawIdx).speed;
-        end
-        data.gait.paw(pawIdx).trace = trace;
-        data.gait.paw(pawIdx).traceType = hd.trace.Value;
+        trace = data.gait.paw(pawIdx).trace;
 
         % get masked
         if isfield(data.gait, 'maskTemp')
@@ -202,7 +194,7 @@ function fig = gait_viewer(default_path)
         data.gait.hd = hd;
     end
 
-    function getPOIs()
+    function getSteps()
         hd = data.gait.hd;
         pawthres = hd.pawthresh.Value;
 
@@ -224,7 +216,7 @@ function fig = gait_viewer(default_path)
             % rising 
             riseIdx = find(trace(1:end-1)<=pawthres & trace(2:end)>pawthres);
             data.gait.paw(ii).rising = riseIdx;
-            % find the point almost zero BEFORE the threshold-crossing point
+            % find the stepnt almost zero BEFORE the threshold-crossing stepnt
             for k=1:length(riseIdx)
                 range = riseIdx(k)+(-MinTimeInterval:0);
                 range(range<=0)=[];
@@ -240,7 +232,7 @@ function fig = gait_viewer(default_path)
             % falling
             fallIdx = find(trace(1:end-1)>pawthres & trace(2:end)<=pawthres)+1;
             data.gait.paw(ii).falling = fallIdx;
-            % find the point almost zero AFTER the threshold-crossing point
+            % find the stepnt almost zero AFTER the threshold-crossing stepnt
             for k=1:length(fallIdx)
                 range = fallIdx(k)+(0:MinTimeInterval);
                 range(range>length(trace))=[];
@@ -270,48 +262,47 @@ function fig = gait_viewer(default_path)
             invalid = trace(valleyIdx) > pawthres;
             valleyIdx(invalid)=[];
             data.gait.paw(ii).valley = valleyIdx;
-
         end
     end
 
-    function plotPOIs()
+    function plotSteps()
         hd = data.gait.hd;
-        if hd.poiCheck.Value && isequal(hd.poiCheck.Enable, 'on')
-            % paw POIs
+        if hd.stepCheck.Value && isequal(hd.stepCheck.Enable, 'on')
+            % paw Steps
             pawIdx = hd.pawList.Value;
-            poiName = hd.poiList.Value;
-            poiIdx = data.gait.paw(pawIdx).(poiName);
-            poiT = data.gait.t(poiIdx);
-            poiX = data.gait.paw(pawIdx).x(poiIdx)*hd.resolution.Value;
-            poiY = data.gait.paw(pawIdx).y(poiIdx)*hd.resolution.Value;
+            stepName = hd.stepList.Value;
+            stepIdx = data.gait.paw(pawIdx).(stepName);
+            stepT = data.gait.t(stepIdx);
+            stepX = data.gait.paw(pawIdx).x(stepIdx)*hd.resolution.Value;
+            stepY = data.gait.paw(pawIdx).y(stepIdx)*hd.resolution.Value;
 
-            % numbers of gait step points.
-            hd.poiNum.Value = length(poiIdx);
+            % numbers of gait step stepnts.
+            hd.stepNum.Value = length(stepIdx);
                 
             linespec = {'mo', 'LineWidth', 2};
-            hd = shared.myPlot(@scatter, hd, 'poiGait', hd.ax, ...
-                            poiT, hd.pawMask.YData(poiIdx), ...
+            hd = shared.myPlot(@scatter, hd, 'stepGait', hd.ax, ...
+                            stepT, hd.pawMask.YData(stepIdx), ...
                             linespec{:});
     
             if data.has('emg')
-                hd = shared.myPlot(@scatter, hd, 'poiEMG', data.emg.hd.ax, ...
-                                poiT, zeros(size(poiT)), linespec{:});
+                hd = shared.myPlot(@scatter, hd, 'stepEMG', data.emg.hd.ax, ...
+                                stepT, zeros(size(stepT)), linespec{:});
             end
     
             if data.has('dlc')
-                hd = shared.myPlot(@scatter, hd, 'poiXDLC', data.dlc.hd.ax, ...
-                                poiT, poiX, linespec{:});
-                hd.poiXDLC.Visible = data.dlc.hd.chk_x.Value;
-                hd = shared.myPlot(@scatter, hd, 'poiYDLC', data.dlc.hd.ax, ...
-                                poiT, poiY, linespec{:});
-                hd.poiYDLC.Visible = data.dlc.hd.chk_y.Value;
+                hd = shared.myPlot(@scatter, hd, 'stepXDLC', data.dlc.hd.ax, ...
+                                stepT, stepX, linespec{:});
+                hd.stepXDLC.Visible = data.dlc.hd.chk_x.Value;
+                hd = shared.myPlot(@scatter, hd, 'stepYDLC', data.dlc.hd.ax, ...
+                                stepT, stepY, linespec{:});
+                hd.stepYDLC.Visible = data.dlc.hd.chk_y.Value;
             end
     
             if data.has('video') 
-                hd = shared.myPlot(@scatter, hd, 'poiVideo', data.video.hd.ax, ...
-                                poiX, poiY, linespec{:});
+                hd = shared.myPlot(@scatter, hd, 'stepVideo', data.video.hd.ax, ...
+                                stepX, stepY, linespec{:});
                 timeWindow = 1;
-                alpha(hd.poiVideo, 2./(1 + exp(abs(poiT-data.currentTime)/timeWindow)));
+                alpha(hd.stepVideo, 2./(1 + exp(abs(stepT-data.currentTime)/timeWindow)));
             end
     
             data.gait.hd = hd;
@@ -333,7 +324,8 @@ function fig = gait_viewer(default_path)
 
     function traceChanged(src,~)
         hd = data.gait.hd;
-        switch src.Value
+        traceType = src.Value;
+        switch traceType
             case 'X'
                 ylabel(hd.ax, 'X (cm)')
             case 'Y'
@@ -341,8 +333,13 @@ function fig = gait_viewer(default_path)
             case 'Speed'
                 ylabel(hd.ax, 'Speed (cm/s)')
         end
-        plotTraces();
-        gaitAnalysis();
+        for ii = 1:numel(hd.pawList.Items)    
+            data.gait.paw(ii).trace = data.gait.paw(ii).(lower(traceType));
+            data.gait.paw(ii).traceType = traceType;
+        end
+        plotTrace();
+        getSteps();
+        plotSteps();
     end
 
     function autoThresh()
@@ -354,16 +351,16 @@ function fig = gait_viewer(default_path)
     function updateInfo()
         if data.has('gait')
             getSpeeds()
-            plotTraces()
-            getPOIs()
-            plotPOIs()
+            plotTrace()
+            getSteps()
+            plotSteps()
         end
     end
 
     function gaitAnalysis()
         % getSpeeds();
-        getPOIs();
-        plotPOIs();
+        getSteps();
+        plotSteps();
     end
 
     function plotSTA(~,~)
@@ -384,11 +381,11 @@ function fig = gait_viewer(default_path)
         end
         
         pawIdx = hd.pawList.Value;
-        poiName = hd.poiList.Value;
-        poiIdx = data.gait.paw(pawIdx).(poiName);
-        poiT = data.gait.t(poiIdx);
+        stepName = hd.stepList.Value;
+        stepIdx = data.gait.paw(pawIdx).(stepName);
+        stepT = data.gait.t(stepIdx);
         
-        [ydata, xdata, info] = GAIT.sta(emg, emgT, poiT, 'plot', data.gait);
+        [ydata, xdata, info] = GAIT.sta(emg, emgT, stepT, 'plot', data.gait);
 
         sta = info;
         sta.ydata = ydata;
@@ -398,10 +395,10 @@ function fig = gait_viewer(default_path)
         idx = data.emg.hd.chanList.ItemsData == channel;
         sta.emgChanName = data.emg.hd.chanList.Items{idx};
         sta.pawName = data.gait.paw(pawIdx).name;
-        sta.poiName = poiName;
+        sta.stepName = stepName;
         sta.traceName = hd.trace.Value;
 
-        title(sta.axis, [sta.pawName ', ' poiName ' on ' sta.traceName ', ' sta.emgChanName], ...
+        title(sta.axis, [sta.pawName ', ' stepName ' on ' sta.traceName ', ' sta.emgChanName], ...
             "Interpreter","none");
 
         data.gait.sta = sta;
@@ -410,8 +407,8 @@ function fig = gait_viewer(default_path)
 
     function pawChanged(~,~)
         getSpeeds();
-        plotTraces();
-        plotPOIs();
+        plotTrace();
+        plotSteps();
     end
 
     function pawThreshChanged(~,~)
@@ -423,20 +420,20 @@ function fig = gait_viewer(default_path)
         gaitAnalysis();
     end
 
-    function poiChanged(~,~)
-        plotPOIs();
+    function stepChanged(~,~)
+        plotSteps();
     end
 
-    function poiCheckChanged(src,~)
+    function stepCheckChanged(src,~)
         hd = data.gait.hd;
-        handles = {'poiGait','poiEMG','poiXDLC','poiYDLC','poiVideo'};
+        handles = {'stepGait','stepEMG','stepXDLC','stepYDLC','stepVideo'};
         for k=1:numel(handles)
             if isfield(hd, handles{k}) && ishghandle(hd.(handles{k}))
                 hd.(handles{k}).Visible = src.Value;
             end
         end
         if src.Value
-            plotPOIs();
+            plotSteps();
         end
     end
 
@@ -461,11 +458,11 @@ function fig = gait_viewer(default_path)
 
     function updateVideoMarker(currentTime)
         hd = data.gait.hd;
-        if isfield(hd, 'poiVideo') && ishghandle(hd.poiVideo)
-            poiIdx = data.gait.paw(hd.pawList.Value).(hd.poiList.Value);
-            poiT = data.gait.t(poiIdx);
-            set(hd.poiVideo, ...
-                "AlphaData", 2./(1 + exp(abs(poiT-currentTime))) );
+        if isfield(hd, 'stepVideo') && ishghandle(hd.stepVideo)
+            stepIdx = data.gait.paw(hd.pawList.Value).(hd.stepList.Value);
+            stepT = data.gait.t(stepIdx);
+            set(hd.stepVideo, ...
+                "AlphaData", 2./(1 + exp(abs(stepT-currentTime))) );
         end
     end
     
@@ -485,7 +482,7 @@ function fig = gait_viewer(default_path)
         data.setZoom(src.Limits);
     end
 
-    function saveFig(~,~)
+    function exportAxes(~,~)
         [file, path] = uiputfile( ...
             {'*.fig', 'Matlab figure (*.fig)'; ...
              '*.png','PNG Image (*.png)'; ...
@@ -500,12 +497,11 @@ function fig = gait_viewer(default_path)
         ax = data.gait.hd.ax;
         [~, ~, ext] = fileparts(file);
         if isequal(ext, '.fig')
-            % if save as matlab figurecopy axes to an invisible figure
+            % if save as matlab figure, copy axes to an invisible figure
             f = figure('Visible','off');
             ax2 = copyobj(ax, f);
             ax2.Units = 'normalized';
             ax2.Position = [0.13 0.11 0.775 0.815];
-            
             savefig(f, fullfile(path,file));
             close(f);
         else

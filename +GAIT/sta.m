@@ -14,7 +14,6 @@ function [sta, x, info] = sta(emg, emg_t, event_time, varargin)
 %  sta : y axis of the average.
 %  x   : x axis for the average.
 %  info: a structure including these fields
-%        info.random_sta_t : x axis of randomized sta
 %        info.random_mean  : center of CI
 %        info.random_std   : std of CI
 %        info.k            : used in mean +- k*std.

@@ -2,7 +2,7 @@ function hfig = StepSync(default_path)
 
     data = shared.SessionData.instance();
     hd = struct();
-    fig = uifigure('Name', 'StepSync Viewer', 'Position', [100 100 400 300], ...
+    fig = uifigure('Name', 'StepSync', 'Position', [100 100 400 300], ...
             'WindowStyle','alwaysontop', 'CloseRequestFcn', @onClose);
     drawnow
     if nargout ==1

@@ -54,10 +54,15 @@ function fig = emg_viewer(default_path)
         
 
         %% Row 4: zoom in, zoom out, update buttons
-        subgrid2 = uigridlayout(grid1, [1 3], 'Padding', [0 0 0 0]);
-        uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn);
-        uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut);
-        uibutton(subgrid2,'Text','⭮','ButtonPushedFcn',@(src,evt)updatePlots());
+        subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
+        uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn, ...
+            'Tooltip','Zoom in');
+        uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
+            'Tooltip','Zoom out');
+        uibutton(subgrid2,'Text','⭯','ButtonPushedFcn',@(src,evt)updateInfo(), ...
+            'Tooltip','Refresh');
+        uibutton(subgrid2,'Text','[➜','ButtonPushedFcn',@exportAxes, ...
+            'Tooltip','Pop out');
 
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateEMGtime(src.currentTime));
@@ -294,6 +299,14 @@ function fig = emg_viewer(default_path)
             xlim(hd.ax, newZoom);
             data.currentZoom = newZoom;
         end
+    end
+
+    function exportAxes(~,~)        
+        ax = data.emg.hd.ax;
+        f = figure();
+        ax2 = copyobj(ax, f);
+        ax2.Units = 'normalized';
+        ax2.Position = [0 0 1 1];
     end
 
     % close function

@@ -62,7 +62,7 @@ function fig = gait_viewer(default_path)
         hd.stepList = uilistbox(subgrid3, 'Multiselect', 'off', ...
             'ValueChangedFcn', @stepChanged, 'Enable','off');
         hd.sta = uibutton(subgrid3, Text='Step Triggered Avg', Enable='off', ...
-                ButtonPushedFcn=@plotSTA);
+                ButtonPushedFcn=@openSTA);
 
         %% Row 4: zoom in, zoom out, update buttons
         subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
@@ -368,46 +368,15 @@ function fig = gait_viewer(default_path)
         plotSteps();
     end
 
-    function plotSTA(~,~)
+    function openSTA(~, ~)
+        mousePos = get(0, 'PointerLocation');
         hd = data.gait.hd;
-        if ~data.has('emg')
-            uialert(fig, 'Requires EMG', 'Error');
-            return;
-        end
-
-        channel = data.emg.hd.chanList.Value;
-        emgType = data.emg.hd.datatype.Value;
-        if strcmp(emgType, "Raw")
-            emg = data.emg.analog_data(:,channel);
-            emgT = data.emg.t;
+        if ~isfield(hd, 'sta_GUI') || ~isgraphics(hd.sta_GUI, 'figure')
+            hd.sta_GUI = GAIT.sta_GUI(mousePos);
+            data.gait.hd = hd;
         else
-            emg = data.emg.processed.data(:,channel);
-            emgT = data.emg.processed.t;
+            figure(hd.sta_GUI);
         end
-        
-        pawIdx = hd.pawList.Value;
-        stepName = hd.stepList.Value;
-        stepIdx = data.gait.paw(pawIdx).(stepName);
-        stepT = data.gait.t(stepIdx);
-        
-        [ydata, xdata, info] = GAIT.sta(emg, emgT, stepT, 'plot', data.gait);
-
-        sta = info;
-        sta.ydata = ydata;
-        sta.xdata = xdata;
-        sta.emgType = emgType;
-        sta.emgChan = channel;
-        idx = data.emg.hd.chanList.ItemsData == channel;
-        sta.emgChanName = data.emg.hd.chanList.Items{idx};
-        sta.pawName = data.gait.paw(pawIdx).name;
-        sta.stepName = stepName;
-        sta.traceName = hd.trace.Value;
-
-        title(sta.axis, [sta.pawName ', ' stepName ' on ' sta.traceName ', ' sta.emgChanName], ...
-            "Interpreter","none");
-
-        data.gait.sta = sta;
-        assignin('base', 'sta', sta);
     end
 
     function pawChanged(~,~)

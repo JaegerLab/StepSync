@@ -1,149 +1,344 @@
-function sta_GUI(mousePos)
-% STA window
-% to do: 
+function fig = sta_GUI(mousePos)
+% GAIT.sta_GUI  Step-Triggered Average parameter & history GUI
+%
+%   fig = GAIT.sta_GUI(mousePos)
+%
+%   Opens a window near mousePos that lets the user:
+%     • Tune STA parameters and compute on demand (Plot button)
+%     • Browse a history of runs via a dropdown
+%     • Restore parameters + replot any previous run (no recompute)
+%     • Delete individual runs or clear all history
+%     • Pop the current plot out into a standalone figure
+%
+%   The window handle is stored at data.gait.hd.sta_GUI and cleared
+%   on close so that gait_viewer can use the isfield/isgraphics idiom.
 
     data = shared.SessionData.instance();
-    parameters = struct();
-    
-    %% draw GUI
-    % grid 4x3
-    mousePos(2)=mousePos(2)-150;
-    fig = uifigure('Name', 'EMG Pre-Process', 'Position', [mousePos 400 150], ...
+
+    %% ── Layout constants ─────────────────────────────────────────────────
+    WIN_W = 580;
+    WIN_H = 480;
+    mousePos(2) = mousePos(2) - WIN_H;   % open below cursor (same convention)
+
+    fig = uifigure('Name', 'Step-Triggered Average', ...
+        'Position', [mousePos WIN_W WIN_H], ...
         'CloseRequestFcn', @onClose);
-    grid1 = uigridlayout(fig, [4 3]);
 
-    % line 1 - parameters
-    chkHighPass = uicheckbox(grid1,'Text', 'High Pass', 'Value', 1);
-    editHighPass = uieditfield(grid1, 'numeric','Value',500);
-    chkFiltFilt = uicheckbox(grid1, 'Text', 'FiltFilt', 'Value', 0);
+    % Root grid: 4 rows × 2 columns
+    %   Col 1 (parameters) | Col 2 (Plot button, spans rows 1-2)
+    grid1 = uigridlayout(fig, [3 1], ...
+        'Padding',      [10 10 10 10], ...
+        'RowSpacing',   6, ...
+        'ColumnSpacing', 8, ...
+        'RowHeight',    {30, '1x', 30});
 
-    % line 2 - rectify
-    chkRectify = uicheckbox(grid1,'Text', 'Rectify', 'Value',1);
+    %% ── Row 1: max_lag | Control checkbox | Normalize checkbox ───────────
+    subR1 = uigridlayout(grid1, [1 6], 'Padding', [0 0 0 0], ...
+        'ColumnWidth', {100, '1x', 70,80,80,80}, ...
+        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
 
-    % line 3 - smooth and downsample
-    chkDownSample = uicheckbox(grid1,'Text', 'Down Sample', 'Value',1, ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 3, 'Column', 1));
+    hd.editMaxLag = uieditfield(subR1, 'numeric', ...
+        'Value', 0.5, ...
+        'ValueDisplayFormat', 'Max Lag: %.2f s', ...
+        'Tooltip', 'Half-window width for STA (seconds)');
+
+    hd.ddMethod = uidropdown(subR1, ...
+        'Items',     {'No control', 'Global signal', 'Random time', 'ISI shuffle', 'Dither Offset'}, ...
+        'ItemsData', {'none', 'global', 'random_time', 'isi_shuffle', 'dither'}, ...
+        'Value',     'dither', ...
+        'Tooltip', 'Method of random control', ...
+        'ValueChangedFcn', @onMethodChanged);
+
+    hd.editNRep = uieditfield(subR1, 'numeric', ...
+        'Value', 100, ...
+        'ValueDisplayFormat', 'nRep: %d', ...
+        'Tooltip', 'Number of repetitions for random control');
+
+    hd.editOffset = uieditfield(subR1, 'numeric', ...
+        'Value', 2, ...
+        'ValueDisplayFormat', 'Offset: %.1f s', ...
+        'Tooltip', 'Random dither max offset (seconds)');
+
+    hd.chkNormalize = uicheckbox(subR1, ...
+        'Text',  'Normalize', ...
+        'Value', false, ...
+        'Tooltip', 'Plot-time z-score normalization (does not change stored data)');
+
+    % ── Plot button ───────────────────────────
+    hd.btnPlot = uibutton(subR1, 'Text', 'Plot', ...
+        'FontSize',  14, ...
+        'FontWeight', 'bold', ...
+        'ButtonPushedFcn', @onPlot);
+
+    %% ── Row 2: plot axes ─────────────────────────────────────────────────
+    hd.ax = uiaxes(grid1, ...
+        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 2, 'Column', 1));
+    box(hd.ax, 'off');
+    hd.ax.XGrid = 'off';
+    hd.ax.YGrid = 'off';
     
+    %% ── Row 3: runs dropdown | Delete | Clear All | Pop Out ─────────────
+    subR3 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0], ...
+        'ColumnWidth', {'1x', 40, 40, 40}, ...
+        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 3, 'Column', 1));
 
-    % line 4 - buttons: preview, save&close, cancel
-    uibutton(grid1, 'Text','Preview', 'ButtonPushedFcn', @preview, ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 4, 'Column', 1));
-    uibutton(grid1, 'Text','Apply & Close', 'ButtonPushedFcn', @saveClose);
-    uibutton(grid1, 'Text','Cancel', 'ButtonPushedFcn', @cancelClose);
+    hd.ddRuns = uidropdown(subR3, ...
+        'Items',    {}, ...
+        'ItemsData', {}, ...
+        'Placeholder', '(no runs yet)', ...
+        'ValueChangedFcn', @onRunSelected);
+
+    uibutton(subR3, 'Text', '🗑️', ...
+        'ButtonPushedFcn', @onDelete);
+
+    uibutton(subR3, 'Text', '🗑️All', ...
+        'ButtonPushedFcn', @onClearAll);
+
+    uibutton(subR3, 'Text', '[➜', ...
+        'Tooltip', 'Pop out to new figure', ...
+        'ButtonPushedFcn', @onPopOut);
+
+    % rebuild dropdown menu items if there were history data
+    rebuildDropdown();
+    % Apply initial greying-out rules
+    applyGreyOut();
+
     drawnow
+    onRunSelected(hd.ddRuns, []);
 
-    data.emg.hd.datatype.Value = "Raw";
-    notify(data, 'DataChanged');
+    %% ═══════════════════════════════════════════════════════════════════
+    %% ── Callbacks ────────────────────────────────────────────────────
+    %% ═══════════════════════════════════════════════════════════════════
 
-    function [new_data, new_t]=process(old_data)
-        t = data.emg.t;
-        fs = 1/median(diff(t));
-        new_data = old_data;
+    function onMethodChanged(~, ~)
+        applyGreyOut();
+    end
 
-        progbar = uiprogressdlg(fig,'Title','Processing', ...
-            'Message','Filtering', ...
-            'Indeterminate','on');
-        drawnow
-
-        if chkHighPass.Value
-            fcut = editHighPass.Value;
-            parameters.filter = designfilt('highpassiir', 'FilterOrder', 4, ...
-                           'HalfPowerFrequency', fcut, 'SampleRate', fs);
-            if chkFiltFilt.Value
-                new_data = filtfilt(parameters.filter, new_data);
-            else
-                new_data = filter(parameters.filter, new_data); 
-            end
+    % ── Main Plot button ──────────────────────────────────────────────────
+    function onPlot(~, ~)
+        if ~data.has('gait')
+            uialert(fig, 'No gait data loaded.', 'Error');
+            return;
         end
-        
-        if chkRectify.Value
-            new_data = abs(new_data);
+        if ~data.has('emg')
+            uialert(fig, 'No EMG data loaded. Load EMG first.', 'Error');
+            return;
         end
-        
-        if chkDownSample.Value
-            % smooth
-            progbar.Message = 'Smoothing';
-            down_fs = editDownRate.Value;
-            downsample_factor = round(fs / down_fs);
-            parameters.smoothWidth = round(2.5 * downsample_factor);
-            new_data = shared.fastsmooth(new_data, parameters.smoothWidth,1,1);
 
-            % truncate and downsample
-            progbar.Message = 'Downsampling';
-            new_data = downsample(new_data(t>=0,:), downsample_factor);
-            new_t = downsample(t(t>=0), downsample_factor);
+        %% Pull live selections from gait_viewer and emg_viewer
+        gHd = data.gait.hd;
+
+        % EMG channel & type
+        emgType = data.emg.hd.datatype.Value;
+        channel = data.emg.hd.chanList.Value;
+        if strcmp(emgType, 'Raw')
+            emg  = data.emg.analog_data(:, channel);
+            emgT = data.emg.t;
         else
-            % truncate (discard negative time)
-            new_data = new_data(t>=0,:);
-            new_t = t(t>=0);
+            emg  = data.emg.processed.data(:, channel);
+            emgT = data.emg.processed.t;
         end
 
-        % close the progress bar
-        close(progbar)
-    end
+        % Paw / step selection
+        pawIdx   = gHd.pawList.Value;
+        stepName = gHd.stepList.Value;
+        stepIdx  = data.gait.paw(pawIdx).(stepName);
+        stepT    = data.gait.t(stepIdx);
 
-    function preview(~,~)
-        ch = data.emg.hd.chanList.Value(1);
-
-        % only process 1 channel for speed
-        [new_data, new_t]=process(data.emg.analog_data(:,ch)); 
-        data.emg.temp.data = new_data;
-        data.emg.temp.t = new_t;
-
-        notify(data, 'DataChanged');
-    end
-
-    function saveClose(~,~)
-        % process all channels
-        [processed_data, processed_t] = process(data.emg.analog_data);
-        data.emg.processed.data = processed_data;
-        data.emg.processed.t = processed_t;
-
-        % save parameters
-        if chkHighPass.Value
-            data.emg.processed.highPassCutOff = editHighPass.Value;
-            data.emg.processed.filterOrder = 4;
-            data.emg.processed.filterType = 'highpassiir';
-            data.emg.processed.filter = parameters.filter;
-            data.emg.processed.filtfilt = chkFiltFilt.Value;
+        % Channel name for label
+        chanItems = data.emg.hd.chanList.Items;
+        chanData  = data.emg.hd.chanList.ItemsData;
+        if iscell(chanData)
+            idx = cellfun(@(x) isequal(x, channel), chanData);
+        else
+            idx = chanData == channel;
         end
-        data.emg.processed.rectify = chkRectify.Value;
-        if chkDownSample.Value
-            data.emg.processed.smoothWidth = parameters.smoothWidth;
-            data.emg.processed.downSampleRate = editDownRate.Value;
+        if any(idx)
+            emgChanName = chanItems{find(idx, 1)};
+        else
+            emgChanName = num2str(channel);
         end
-        
-        data.emg.hd.datatype.Items = ["Raw","Processed"];
-        data.emg.hd.datatype.Value = "Processed";
 
-        close(fig);
-    end
+        pawName   = data.gait.paw(pawIdx).name;
+        traceName = gHd.trace.Value;
 
-    function cancelClose(~,~)
-        close(fig);
-    end
+        %% Collect GUI parameters
+        max_lag   = hd.editMaxLag.Value;
+        method    = hd.ddMethod.Value;
+        nRep      = round(hd.editNRep.Value);
+        offset    = hd.editOffset.Value;
+        normalize = hd.chkNormalize.Value;
+        nStd      = 3;   % fixed in spec; could expose later
 
-    function onClose(src,~)
-        if isfield(data.emg, 'temp')
-            data.emg = rmfield(data.emg, 'temp');
+        %% Compute STA
+        result = GAIT.sta(emg, emgT, stepT, ...
+            'max_lag',   max_lag, ...
+            'method',    method, ...
+            'nRep',      nRep, ...
+            'offset',    offset, ...
+            'normalize', normalize, ...
+            'nStd',      nStd, ...
+            'plot',      false);
+
+        %% Append caller-supplied metadata fields
+        result.pawName     = pawName;
+        result.stepName    = stepName;
+        result.traceName   = traceName;
+        result.emgType     = emgType;
+        result.emgChan     = channel;
+        result.emgChanName = emgChanName;
+
+        %% Save to data store (grow the array)
+        if ~isfield(data.gait, 'sta') || isempty(data.gait.sta)
+            data.gait.sta    = result;
+            newIdx = 1;
+        else
+            data.gait.sta(end + 1) = result;
+            newIdx = numel(data.gait.sta);
         end
-        notify(data, 'DataChanged');
-        delete(src)
+
+        %% Add entry to dropdown
+        label = makeLabel(result);
+        currentItems     = hd.ddRuns.Items;
+        currentItemsData = hd.ddRuns.ItemsData;
+        if isempty(currentItemsData)
+            currentItemsData = {};
+        end
+        hd.ddRuns.Items     = [currentItems, {label}];
+        hd.ddRuns.ItemsData = [currentItemsData, {newIdx}];
+        hd.ddRuns.Value     = newIdx;
+
+        %% Plot into our axis
+        GAIT.plot_sta(result, hd.ax);
+        title(hd.ax, label, 'Interpreter', 'none');
     end
 
-    function plot_sta()
+    % ── Dropdown selection: restore params & replot ───────────────────────
+    function onRunSelected(src, ~)
+        if isempty(src.Items)
+            return;
+        end
+        idx    = src.Value;
+        result = data.gait.sta(idx);
+
+        % Restore parameter widgets
+        hd.editMaxLag.Value  = result.max_lag;
+        hd.chkNormalize.Value = result.normalize;
+        hd.editNRep.Value    = result.nRep;
+        hd.editOffset.Value  = result.offset;
+
+        % Restore method dropdown (use stored method, which may be 'global'
+        % even if user originally requested something else — that is correct
+        % because result.method reflects what was actually computed)
+        if ismember(result.method, hd.ddMethod.ItemsData)
+            hd.ddMethod.Value = result.method;
+        end
+
+        applyGreyOut();
+
+        % Replot from stored data — no recompute
+        GAIT.plot_sta(result, hd.ax);
+        title(hd.ax, makeLabel(result), 'Interpreter', 'none');
     end
 
-    function plot_randomized()
+    % ── Delete current run ────────────────────────────────────────────────
+    function onDelete(~, ~)
+        if isempty(hd.ddRuns.Items)
+            return;
+        end
+        selIdx = hd.ddRuns.Value;   % run index into data.gait.sta
+
+        % Remove from data store
+        keep = true(1, numel(data.gait.sta));
+        keep(selIdx) = false;
+        data.gait.sta = data.gait.sta(keep);
+
+        % Rebuild dropdown (indices must be renumbered)
+        rebuildDropdown();
+
+        % Select adjacent run or blank axis
+        n = numel(data.gait.sta);
+        if n == 0
+            cla(hd.ax);
+            title(hd.ax, '');
+        else
+            newSel = min(selIdx, n);
+            hd.ddRuns.Value = newSel;
+            onRunSelected(hd.ddRuns, []);
+        end
     end
 
-    function plot_normalized()
+    % ── Clear all runs ────────────────────────────────────────────────────
+    function onClearAll(~, ~)
+        data.gait.sta       = struct([]);   % empty struct array
+        hd.ddRuns.Items     = {};
+        hd.ddRuns.ItemsData = {};
+        cla(hd.ax);
+        title(hd.ax, '');
     end
 
-    function export_2_base()
+    % ── Pop out current axis to a new figure ──────────────────────────────
+    function onPopOut(~, ~)
+        ax  = hd.ax;
+        f   = figure();
+        ax2 = copyobj(ax, f);
+        ax2.Units    = 'normalized';
+        ax2.Position = [0 0 1 1];
     end
 
-    function save_figure()
+    % ── Window close ─────────────────────────────────────────────────────
+    function onClose(src, ~)
+        % Clear the stored handle so gait_viewer knows the window is gone
+        if data.has('gait') && isfield(data.gait, 'hd') && isfield(data.gait.hd, 'sta_GUI')
+            data.gait.hd = rmfield(data.gait.hd, 'sta_GUI');
+        end
+        delete(src);
     end
+
+    %% ═══════════════════════════════════════════════════════════════════
+    %% ── Helpers ──────────────────────────────────────────────────────
+    %% ═══════════════════════════════════════════════════════════════════
+
+    function applyGreyOut()
+        method  = hd.ddMethod.Value;
+        ctrlOn  = ~strcmp(method, 'none');
+        isGlobal = strcmp(method, 'global');
+
+        % Control unchecked → grey everything control-related
+        % setEnable(hd.ddMethod,     ctrlOn);
+        setEnable(hd.editNRep,     ctrlOn && ~isGlobal);
+        setEnable(hd.chkNormalize, ctrlOn);
+        setEnable(hd.editOffset,   ctrlOn && strcmp(method, 'dither'));
+    end
+
+    function setEnable(widget, tf)
+        if tf
+            widget.Enable = 'on';
+        else
+            widget.Enable = 'off';
+        end
+    end
+
+    function label = makeLabel(result)
+        label = [result.pawName ', ' result.stepName ...
+                 ' on ' result.traceName ', ' result.emgChanName];
+        if result.normalize && ~strcmp(result.method, 'none')
+            label = [label ', normalized'];
+        end
+    end
+
+    function rebuildDropdown()
+        if isfield(data.gait, 'sta') && ~isempty(data.gait.sta)
+            n = numel(data.gait.sta);
+            items     = cell(1, n);
+            itemsData = cell(1, n);
+            for k = 1:n
+                items{k}     = makeLabel(data.gait.sta(k));
+                itemsData{k} = k;
+            end
+            hd.ddRuns.Items     = items;
+            hd.ddRuns.ItemsData = itemsData;
+        end
+    end
+
 end
-

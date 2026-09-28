@@ -1,165 +1,211 @@
-function [sta, x, info] = sta(emg, emg_t, event_time, varargin)
+function result = sta(emg, emg_t, event_time, varargin)
+% GAIT.sta  Step-Triggered Average
+%
+%   result = GAIT.sta(emg, emg_t, event_time, Name, Value, ...)
+%
+%   Required inputs:
+%     emg        : EMG signal vector
+%     emg_t      : Time axis of EMG (seconds)
+%     event_time : Array of event times (seconds)
+%
+%   Name-Value parameters:
+%     'max_lag'   - Window half-width in seconds          (default: 0.5)
+%     'method'    - Control method: 'dither' | 'random_time' |
+%                   'isi_shuffle' | 'global' | 'none'     (default: 'dither')
+%     'nRep'      - Repetitions for repeated methods      (default: 100)
+%     'offset'    - Dither half-width in seconds       global   (default: 2)
+%     'normalize' - Store normalize flag (plot-time only) (default: false)
+%     'nStd'      - CI width in std devs                  (default: 3)
+%     'plot'      - false / true / axes / figure handle   (default: false)
+%
+%   Output: flat struct with fields:
+%     t, y, max_lag, control, method, nRep, offset, normalize, nStd,
+%     random_t, random_mean, random_std, eventNum, sample_rate
 
-% GAIT.sta: Spike-triggered Averaging
-% 
-%  [sta, x, info] = GAIT.sta(emg, emg_t, event_time, max_lag, plotit)
-% 
-%  emg: EMG.
-%  emg_t: the t axis of EMG, unit in Second
-%  event_time  : An array of each event time. in Seconds.
-%  max_lag     : A number, the result range is [-max_lag, max_lag] 
-%                unit in S.
-%  plotit      : 'plot' to plot the mean averaged over traces.
-%                or specify an axes object to plot in.
-%  sta : y axis of the average.
-%  x   : x axis for the average.
-%  info: a structure including these fields
-%        info.random_mean  : center of CI
-%        info.random_std   : std of CI
-%        info.k            : used in mean +- k*std.
+    %% ── Parse name-value arguments ───────────────────────────────────────
+    p = inputParser();
+    p.addRequired('emg');
+    p.addRequired('emg_t');
+    p.addRequired('event_time');
+    p.addParameter('max_lag',   0.5,      @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('method',    'dither', @(x) ischar(x) || isstring(x));
+    p.addParameter('nRep',      100,      @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('offset',    2,        @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('normalize', false,    @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
+    p.addParameter('nStd',      3,        @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('plot',      false);
+    p.parse(emg, emg_t, event_time, varargin{:});
 
-% assign the arguments========================
-narginchk(3,6)
-
-for k=1:length(varargin)
-    if ischar(varargin{k})
-        plotit=varargin{k};
-    elseif isnumeric(varargin{k})
-        max_lag=varargin{k};
-    elseif isa(varargin{k}, 'matlab.graphics.axis.Axes')
-        plotit = varargin{k};
-    elseif isstruct(varargin{k})
-        gait = varargin{k};
-    else
-        error('Wrong argument')
-    end
-end
-if ~exist('max_lag', 'var')
-    max_lag=0.5;
-    max_lag=min(max_lag, max(emg_t));
-end
-sample_rate = round(1/mean(diff(emg_t)));
-
-% remove out of bound data
-emg(emg_t<=0)=[];
-emg_t(emg_t<=0)=[];
-traceLength=length(emg);
-event_time(isnan(event_time))=[];
-event_index=round(event_time.*sample_rate);
-
-if any(event_index>traceLength | event_index<=0)
-    event_index(event_index>traceLength | event_index<=0)=[];
-    warning('Event time out of bound');
-end
-
-% construct event train
-eventNum = length(event_index);
-event_train=zeros(traceLength,1);
-event_train(event_index)=1/eventNum;
-
-% calculate spike triggered average, using xcorr function
-tic
-[sta, m_lags]=xcorr(emg, event_train,round(max_lag*sample_rate));
-x = m_lags(:)./sample_rate;
-elapsed_t = toc;
-
-if elapsed_t > 0.05
+    max_lag   = p.Results.max_lag;
     
-end
+    method    = char(p.Results.method);
+    doControl = ~strcmp(method, 'none');
+    nRep      = round(p.Results.nRep);
+    offset    = p.Results.offset;
+    normalize = logical(p.Results.normalize);
+    nStd      = p.Results.nStd;
+    plotArg   = p.Results.plot;
 
-% =============== random control ======================
-info = struct();
-random_method = 3;
-nStd=3; % grey box of random sta: 2*std = 95% CI, 3*std = 99.7% CI
-rand_range = 2;  % width of random dither (second)
-
-if random_method ==1
-    % mean(emg) +- std(emg)/sqrt(eventNum)
-    random_mean = mean(emg);
-    random_std = std(emg);
-elseif random_method == 2
-    % mean +- std within moving periods
-    % if exist('gait','var')
-    %     random_range = repelem(gait.body.speed < 1, 1, 500); %gait.bodythres
-    % else
-    %     % random_range = 1:length(emg);
-    %     disp('error')
-    % end
-    range = [289*200:293*200 777*200:784*200 809*200:813*200];
-
-    random_mean = mean(emg(range));
-    random_std = std(emg(range));
-elseif random_method ==3
-    % === randomly shift real event time =======
-    rep = 100;
-    random_sta = zeros(2*max_lag*sample_rate+1, rep);
-    % disp('randomized control repitition:')
-    for kk=1:rep
-        % add random shift
-        
-        random_index=event_index + round(rand_range*sample_rate.*(rand(size(event_index))-0.5));
-        random_index(random_index>traceLength | random_index<=0)=[];
-        random_train=zeros(traceLength,1);
-        random_train(random_index)=1/eventNum;
-        [random_sta(:,kk), random_sta_x]=xcorr(emg, random_train, round(max_lag*sample_rate));
+    % Validate method string
+    valid_methods = {'none','global','random_time','isi_shuffle','dither'};
+    if ~ismember(method, valid_methods)
+        error('GAIT:sta:badMethod', ...
+            'method must be one of: none, global, dither, random_time, isi_shuffle. Got: %s', method);
     end
-    random_sta_t = random_sta_x(:)./sample_rate;
-    random_mean = mean(random_sta, 2);
-    random_std = std(random_sta, 0, 2);
 
-end
-% info.random_sta_t = random_sta_t;
-info.random_mean = random_mean;
-info.random_std = random_std;
+    %% ── Pre-process signals ──────────────────────────────────────────────
+    emg       = emg(:);
+    emg_t     = emg_t(:);
+    event_time = event_time(:);
 
-if exist('plotit','var')
-    if isequal(plotit, 'plot')
-        fig = figure();
-        ax = axes(fig);
-    elseif isa(plotit, 'matlab.graphics.axis.Axes')
-        ax = axes(plotit);
+    sample_rate = round(1 / mean(diff(emg_t)));
+    max_lag = min(max_lag, max(emg_t));  % clamp to trace length
+
+    % Discard negative-time samples
+    emg(emg_t <= 0) = [];
+    emg_t(emg_t <= 0) = [];
+    traceLength = length(emg);
+
+    % Clean event times
+    event_time(isnan(event_time)) = [];
+    event_index = round(event_time .* sample_rate);
+
+    out_of_bound = event_index > traceLength | event_index <= 0;
+    if any(out_of_bound)
+        event_index(out_of_bound) = [];
+        warning('GAIT:sta:outOfBound', 'Some event times were out of bounds and removed.');
     end
-    
-    % ============ sta result ======================
-    plot(ax, x, sta, 'k');
-    box off
 
-    hold on;
-    % random control
-    if random_method == 3
-        line1 = plot(random_sta_t, random_mean, 'k--');
-        fill1 = fill([random_sta_t; flipud(random_sta_t)], ...
-            [random_mean; flipud(random_mean)] + nStd.*[random_std; -flipud(random_std)], ...
-            'k', 'EdgeColor', 'none', 'FaceAlpha', 0.15);
-    else
-        line1 = yline(random_mean, 'k--');
-        fill1 = fill(max_lag*[-1 1 1 -1], ...
-            random_mean + nStd*random_std*[-1 -1 1 1], ...
-        'k', 'EdgeColor', 'none', 'FaceAlpha', 0.15);
+    eventNum   = length(event_index);
+    lag_samps  = round(max_lag * sample_rate);
+
+    % Build event train
+    event_train = zeros(traceLength, 1);
+    event_train(event_index) = 1 / eventNum;
+
+    %% ── Compute STA ─────────────────────────────────────────────────────
+    tic
+    [y_raw, m_lags] = xcorr(emg, event_train, lag_samps);
+    t = m_lags(:) ./ sample_rate;
+    elapsed_t = toc;
+
+    %% ── Long-computation warning ─────────────────────────────────────────
+    % Only relevant for repeated-method controls
+    needs_rep = doControl && ~strcmp(method, 'global') && ~strcmp(method, 'none');
+    actual_method = method;   % may be overridden to 'global' if user cancels
+
+    if needs_rep
+        estimated_total = elapsed_t * nRep;
+        if estimated_total > 5
+            msg = sprintf( ...
+                ['Estimated computation time: %.1f seconds\n' ...
+                 '(%d repetitions × %.2f s each)\n\n' ...
+                 'Continue with ''%s''?\n' ...
+                 'Or use the fast ''global'' control instead?'], ...
+                estimated_total, nRep, elapsed_t, method);
+            choice = questdlg(msg, 'Long Computation Warning', ...
+                'Continue', 'Use Global', 'Cancel', 'Continue');
+            switch choice
+                case 'Cancel'
+                    % Return minimal result with no control
+                    actual_method = 'none';
+                    result = struct();
+                    result.t          = t;
+                    result.y          = y_raw;
+                    result.max_lag    = max_lag;
+                    result.method     = actual_method;
+                    result.nRep       = nRep;
+                    result.offset     = offset;
+                    result.normalize  = normalize;
+                    result.nStd       = nStd;
+                    result.random_t   = t;
+                    result.random_mean = zeros(size(t));
+                    result.random_std  = zeros(size(t));
+                    result.eventNum   = eventNum;
+                    result.sample_rate = sample_rate;
+                    return;
+                case 'Use Global'
+                    actual_method = 'global';
+                    needs_rep     = false;
+                    % fall through to control computation below
+                % 'Continue' → proceed as requested
+            end
+        end
     end
-    uistack(line1,"down")
-    uistack(fill1,"bottom")
 
-    % central vertical line
-    xline(0,':k','HandleVisibility', 'off');
+    %% ── Random control ───────────────────────────────────────────────────
+    random_mean = zeros(size(t));
+    random_std  = zeros(size(t));
 
-	% peak texts
-    [~,index_max_sta] = max(sta-random_mean);
-	text(x(index_max_sta), sta(index_max_sta), num2str(x(index_max_sta)), ...
-        'VerticalAlignment','bottom','HorizontalAlignment','center')
-    [~,index_min_sta] = min(sta-random_mean);
-    text(x(index_min_sta), sta(index_min_sta), num2str(x(index_min_sta)), ...
-        'VerticalAlignment','top','HorizontalAlignment','center')
+    if doControl
+        switch actual_method
+            %% ── global: whole-trace mean/std, no lag structure ───────────
+            case 'global'
+                random_mean = mean(emg) ;
+                random_std  = std(emg) ;
 
-    % figure title and axis labels
-    xlabel('t (s)');
-    percentage = {'68.3%','95.5%','99.7%'};
-    legend({ [num2str(nStd) '*STD CI:' percentage{nStd}], 'random mean', 'STA'})
+            %% ── dither: jitter each real event by ±offset seconds ────────
+            case 'dither'
+                random_sta = zeros(2 * lag_samps + 1, nRep);
+                for k = 1:nRep
+                    rand_shift = round(offset * sample_rate .* (rand(size(event_index)) - 0.5));
+                    rand_idx   = event_index + rand_shift;
+                    rand_idx(rand_idx > traceLength | rand_idx <= 0) = [];
+                    rand_train = zeros(traceLength, 1);
+                    rand_train(rand_idx) = 1 / numel(rand_idx);
+                    random_sta(:, k) = xcorr(emg, rand_train, lag_samps);
+                end
+                random_mean = mean(random_sta, 2);
+                random_std  = std(random_sta, 0, 2);
 
-    % title([inputname(1) ', ' inputname(3)], 'Interpreter','none')
+            %% ── random_time: draw eventNum times uniformly ───────────────
+            case 'random_time'
+                random_sta = zeros(2 * lag_samps + 1, nRep);
+                for k = 1:nRep
+                    rand_idx   = randperm(traceLength, eventNum);
+                    rand_train = zeros(traceLength, 1);
+                    rand_train(rand_idx) = 1 / eventNum;
+                    random_sta(:, k) = xcorr(emg, rand_train, lag_samps);
+                end
+                random_mean = mean(random_sta, 2);
+                random_std  = std(random_sta, 0, 2);
 
-	hold off;
+            %% ── isi_shuffle: permute inter-step intervals ────────────────
+            case 'isi_shuffle'
+                isi = diff([0; event_time]);
+                random_sta = zeros(2 * lag_samps + 1, nRep);
+                for k = 1:nRep
+                    shuffled_isi  = isi(randperm(length(isi)));
+                    rand_times    = cumsum(shuffled_isi);
+                    rand_idx      = round(rand_times .* sample_rate);
+                    rand_idx(rand_idx > traceLength | rand_idx <= 0) = [];
+                    rand_train = zeros(traceLength, 1);
+                    rand_train(rand_idx) = 1 / eventNum;
+                    random_sta(:, k) = xcorr(emg, rand_train, lag_samps);
+                end
+                random_mean = mean(random_sta, 2);
+                random_std  = std(random_sta, 0, 2);
+        end
+    end
 
-    info.fig = fig;
-    info.axis = ax;
+    %% ── Build output struct ──────────────────────────────────────────────
+    result = struct();
+    result.t           = t;
+    result.y           = y_raw;
+    result.max_lag     = max_lag;
+    result.method      = actual_method;   % what was actually computed
+    result.nRep        = nRep;
+    result.offset      = offset;
+    result.normalize   = normalize;
+    result.nStd        = nStd;
+    result.random_t    = t;
+    result.random_mean = random_mean;
+    result.random_std  = random_std;
+    result.eventNum    = eventNum;
+    result.sample_rate = sample_rate;
+
+    %% ── Optional plot ────────────────────────────────────────────────────
+    if ~isequal(plotArg, false) && ~isequal(plotArg, 0)
+        GAIT.plot_sta(result, plotArg);
+    end
 end

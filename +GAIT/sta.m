@@ -30,7 +30,7 @@ function result = sta(emg, emg_t, event_time, varargin)
     p.addParameter('max_lag',   0.5,      @(x) isnumeric(x) && isscalar(x) && x > 0);
     p.addParameter('method',    'dither', @(x) ischar(x) || isstring(x));
     p.addParameter('nRep',      100,      @(x) isnumeric(x) && isscalar(x) && x > 0);
-    p.addParameter('offset',    2,        @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('offset',    1,        @(x) isnumeric(x) && isscalar(x) && x > 0);
     p.addParameter('normalize', false,    @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
     p.addParameter('nStd',      3,        @(x) isnumeric(x) && isscalar(x) && x > 0);
     p.addParameter('plot',      false);
@@ -91,7 +91,7 @@ function result = sta(emg, emg_t, event_time, varargin)
 
     %% ── Long-computation warning ─────────────────────────────────────────
     % Only relevant for repeated-method controls
-    needs_rep = doControl && ~strcmp(method, 'global') && ~strcmp(method, 'none');
+    needs_rep = doControl && ~strcmp(method, 'global');
     actual_method = method;   % may be overridden to 'global' if user cancels
 
     if needs_rep
@@ -104,29 +104,15 @@ function result = sta(emg, emg_t, event_time, varargin)
                  'Or use the fast ''global'' control instead?'], ...
                 estimated_total, nRep, elapsed_t, method);
             choice = questdlg(msg, 'Long Computation Warning', ...
-                'Continue', 'Use Global', 'Cancel', 'Continue');
+                'Continue', 'Use Global', 'No Control', 'Continue');
             switch choice
-                case 'Cancel'
+                case 'No Control'
                     % Return minimal result with no control
-                    actual_method = 'none';
-                    result = struct();
-                    result.t          = t;
-                    result.y          = y_raw;
-                    result.max_lag    = max_lag;
-                    result.method     = actual_method;
-                    result.nRep       = nRep;
-                    result.offset     = offset;
-                    result.normalize  = normalize;
-                    result.nStd       = nStd;
-                    result.random_t   = t;
-                    result.random_mean = zeros(size(t));
-                    result.random_std  = zeros(size(t));
-                    result.eventNum   = eventNum;
-                    result.sample_rate = sample_rate;
-                    return;
+                    actual_method = 'none';  
+                    doControl = false;
                 case 'Use Global'
                     actual_method = 'global';
-                    needs_rep     = false;
+                    % needs_rep     = false;
                     % fall through to control computation below
                 % 'Continue' → proceed as requested
             end
@@ -148,7 +134,7 @@ function result = sta(emg, emg_t, event_time, varargin)
             case 'dither'
                 random_sta = zeros(2 * lag_samps + 1, nRep);
                 for k = 1:nRep
-                    rand_shift = round(offset * sample_rate .* (rand(size(event_index)) - 0.5));
+                    rand_shift = round(offset * 2 * sample_rate .* (rand(size(event_index)) - 0.5));
                     rand_idx   = event_index + rand_shift;
                     rand_idx(rand_idx > traceLength | rand_idx <= 0) = [];
                     rand_train = zeros(traceLength, 1);

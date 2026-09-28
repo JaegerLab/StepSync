@@ -227,6 +227,9 @@ function fig = sta_GUI(mousePos)
         hd.editNRep.Value    = result.nRep;
         hd.editOffset.Value  = result.offset;
 
+        % Could be used later when nStd is controllable in GUI
+        % hd.editNStd = result.nStd;
+
         % Restore method dropdown (use stored method, which may be 'global'
         % even if user originally requested something else — that is correct
         % because result.method reflects what was actually computed)

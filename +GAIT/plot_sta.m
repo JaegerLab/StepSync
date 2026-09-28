@@ -1,24 +1,22 @@
 function ax = plot_sta(result, target)
 % GAIT.plot_sta  Draw a Step-Triggered Average result into an axes.
 %
-%   ax = GAIT.plot_sta(result)          – creates a new figure
+%   ax = GAIT.plot_sta(result)          – result from GAIT.sta
 %   ax = GAIT.plot_sta(result, target)  – target is axes or figure handle
 %
 %   Draws:
 %     • Raw STA line (black solid)
-%     • If result.control: dashed control-mean + shaded CI
-%       – Curve-shaped fill for repeated methods (dither/random_time/isi_shuffle)
-%       – Flat rectangle spanning [-max_lag, max_lag] for 'global'
+%     • If there's control: dashed control-mean + shaded confidence interval
 %     • Vertical centre line at t = 0
 %     • Text labels at peak and trough times (relative to control mean)
 %     • Legend
 %
-%   Normalization (plot-time only, never stored):
+%   Normalization:
 %     When result.normalize is true, display as pointwise z-score:
 %       y_disp(t) = (y(t) - random_mean(t)) / random_std(t)
-%     This collapses the control mean to 0 and CI to ±nStd for every method.
+%     This collapses the control mean to 0 and CI to ± nStd for every method.
 %
-%   Note: Title is NOT set here — the caller (sta_GUI) sets it.
+% See also: GAIT.sta
 
     %% ── Resolve target axes ──────────────────────────────────────────────
     if nargin < 2 || isempty(target) || isequal(target, false) || isequal(target, true)
@@ -68,7 +66,7 @@ function ax = plot_sta(result, target)
         ci_upper = rand_mean_disp + nStd .* rand_std_disp;
         ci_lower = rand_mean_disp - nStd .* rand_std_disp;
 
-        if is_global || normalize || isscalar(ci_upper) || isscarlar(ci_lower)
+        if is_global || normalize || isscalar(ci_upper) || isscalar(ci_lower)
             % Flat rectangle to reduce complexity of the graph
             fill_x = max_lag .* [-1 1 1 -1];
             fill_y = [ci_lower(1) ci_lower(1) ci_upper(1) ci_upper(1)];

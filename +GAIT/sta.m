@@ -13,13 +13,13 @@ function result = sta(emg, emg_t, event_time, varargin)
 %     'method'    - Control method: 'dither' | 'random_time' |
 %                   'isi_shuffle' | 'global' | 'none'     (default: 'dither')
 %     'nRep'      - Repetitions for repeated methods      (default: 100)
-%     'offset'    - Dither half-width in seconds       global   (default: 2)
+%     'offset'    - Dither max offset in seconds          (default: 2)
 %     'normalize' - Store normalize flag (plot-time only) (default: false)
 %     'nStd'      - CI width in std devs                  (default: 3)
 %     'plot'      - false / true / axes / figure handle   (default: false)
 %
 %   Output: flat struct with fields:
-%     t, y, max_lag, control, method, nRep, offset, normalize, nStd,
+%     t, y, max_lag, method, nRep, offset, normalize, nStd,
 %     random_t, random_mean, random_std, eventNum, sample_rate
 
     %% ── Parse name-value arguments ───────────────────────────────────────

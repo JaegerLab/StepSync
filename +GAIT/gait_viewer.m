@@ -6,8 +6,9 @@ function fig = gait_viewer(default_path)
     function drawGUI(default_path)
         hd = struct;
         % gait viewer window with uigridlayout
-        fig = uifigure('Name', 'Gait Viewer', 'Position', [100 100 1000 400], ...
+        fig = uifigure('Name', 'Gait Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn',@onClose);
+        data.fig(1).gait = fig;
         drawnow
         grid1 = uigridlayout(fig, Padding = [20,20,20,20], ...
             ColumnWidth = {'1x', 140}, RowHeight = {30, 30, '1x', 30});
@@ -43,7 +44,8 @@ function fig = gait_viewer(default_path)
 
         
         %% Row 3: DLC plot
-        hd.ax = uiaxes(grid1); 
+        hd.ax = uiaxes(grid1); hold(hd.ax, 'on');
+        hd.ax.ButtonDownFcn = @axClicked;
         hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
         hd.ax.Layout.Row = [3 4]; hd.ax.Layout.Column = 1;
         ylabel(hd.ax, 'Speed (cm/s)'); xlabel(hd.ax, 'Time (s)')
@@ -71,7 +73,7 @@ function fig = gait_viewer(default_path)
             'Tooltip','Zoom in');
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
             'Tooltip','Zoom out');
-        uibutton(subgrid2,'Text','⭯','ButtonPushedFcn',@(src,evt)updateInfo(), ...
+        uibutton(subgrid2,'Text','⭯','ButtonPushedFcn',@refresh, ...
             'Tooltip','Refresh');
         uibutton(subgrid2,'Text','[➜','ButtonPushedFcn',@exportAxes, ...
             'Tooltip','Pop out');
@@ -88,29 +90,40 @@ function fig = gait_viewer(default_path)
     function importPaws(~,~)
         hd = data.gait.hd;
         if ~data.has('dlc')
-            % read dlc from file.
+            % no dlc data, read dlc from file.
             filename = hd.path.Value;
             [filename, pathname]=uigetfile(filename, 'Open DeepLabCut file');
             if isequal(pathname,0), return; end
             filename=fullfile(pathname, filename);
             if ~exist(filename, "file"), return; end
-            hd.path.Value = pathname;
         
-            data.dlc.table = DLC.read_dlc(filename);
+            table_dlc = DLC.read_dlc(filename);
+            part_list = table_dlc.Properties.UserData;
+            hd.path.Value = pathname;
         else
+            % read dlc from dlc_viewer
+            table_dlc = data.dlc.table;
+            part_list = data.dlc.hd.list_bodyparts.Items;
             hd.path.Value = data.dlc.hd.path.Value;
         end
-
-        % get bodypart list
-        part_list = data.dlc.hd.list_bodyparts.Items;
         
         % select paws
         [pawIdx, tf] = listdlg('PromptString','Select paws:','ListString',part_list);
+        drawnow; figure(fig);
         if ~tf, return; end
 
         % add selected body parts into GUI lists
         hd.pawList.Items = part_list(pawIdx); hd.pawList.Enable = 'on';
         hd.pawList.ItemsData = 1:numel(pawIdx);
+
+        % save raw x, y in pixels, 
+        % so that later no need to read from dlc when frame rate changes.
+        for ii = 1:numel(hd.pawList.Items) 
+            pawName = hd.pawList.Items{ii};
+            data.gait.paw(ii).name = pawName;
+            data.gait.paw(ii).raw_x = table_dlc.([pawName '_x']);
+            data.gait.paw(ii).raw_y = table_dlc.([pawName '_y']);
+        end
 
         % enable Steps
         hd.stepCheck.Enable = 'on';
@@ -119,8 +132,6 @@ function fig = gait_viewer(default_path)
         hd.stepList.Items = {'rising','falling','onset','offset','peak','valley'};
         hd.stepList.ItemsData = {'rising','falling','onset','offset','peak','valley'};
         hd.stepList.Value = 'rising';
-
-        data.gait.hd = hd;
 
         getSpeeds();
         plotTrace();
@@ -132,34 +143,39 @@ function fig = gait_viewer(default_path)
         hd = data.gait.hd;
         hd.frameRate.Value = data.getFrameRate;
         data.gait.speedFactor = hd.frameRate.Value / hd.resolution.Value;
+        traceType = lower(hd.trace.Value);
 
-        for ii = 1:numel(hd.pawList.Items)                
-            data.gait.paw(ii).name = hd.pawList.Items{ii};
-            x = data.dlc.table.([data.gait.paw(ii).name '_x']);
-            y = data.dlc.table.([data.gait.paw(ii).name '_y']);
-            paw_speed = GAIT.smooth_speed(x, y, 3).*data.gait.speedFactor;
+        for ii = 1:numel(hd.pawList.Items)    
+            paw = data.gait.paw(ii);
 
-            data.gait.paw(ii).x = x./hd.resolution.Value;
-            data.gait.paw(ii).y = y./hd.resolution.Value;
-            data.gait.paw(ii).speed = paw_speed;
+            % convert raw xy (in pixels) to xy (in centimeters)
+            data.gait.paw(ii).x = paw.raw_x./hd.resolution.Value;
+            data.gait.paw(ii).y = paw.raw_y./hd.resolution.Value;
+            
+            % calculate speed in cm/s
+            data.gait.paw(ii).speed = ...
+                GAIT.smooth_speed(paw.raw_x, paw.raw_y, 3) .* ...
+                data.gait.speedFactor;
 
-            traceType = hd.trace.Value;
-            data.gait.paw(ii).trace = data.gait.paw(ii).(lower(traceType));
+            data.gait.paw(ii).trace = data.gait.paw(ii).(traceType);
             data.gait.paw(ii).traceType = traceType;
+            data.gait.paw(ii).thresh = struct('x',NaN,'y',NaN,'speed',NaN);
         end
+        % reconstruct t
+        data.gait.t = (1:length(paw.x))'./hd.frameRate.Value;
     end
    
     function plotTrace()
         hd = data.gait.hd;
         hold(hd.ax, 'on');
-        data.gait.t = data.dlc.t;
 
-        % paw speed
+        % get trace
         pawIdx = hd.pawList.Value;
         t = data.gait.t;
         trace = data.gait.paw(pawIdx).trace;
+        traceType = data.gait.paw(pawIdx).traceType;
 
-        % get masked
+        % get mask
         if isfield(data.gait, 'maskTemp')
             mask = data.gait.maskTemp;
         elseif isfield(data.gait, 'mask')
@@ -168,27 +184,35 @@ function fig = gait_viewer(default_path)
             data.gait.mask = true(size(trace));
             mask = data.gait.mask;
         end
-        unmask = ~mask | circshift(~mask, 1) | circshift(~mask, -1);
+        unmask = ~mask;
 
-        % unmasked
+        % plot unmasked as grey blue
         if any(unmask)
-            t_unmask = t; t_unmask(~unmask)=NaN;
+            % Expand unmask 1 datapoint so there're no gaps.
+            unmask = unmask | unmask([1 1:end-1]) | unmask([2:end end]);
+            t_unmask = t; t_unmask(~unmask) = NaN;
             trace_unmask = trace; trace_unmask(~unmask) = NaN;
             hd = shared.myPlot(@plot, hd, 'pawUnmask', hd.ax, ...
                     t_unmask, trace_unmask, ...
-                    'Color', '#AAAACC', 'ButtonDownFcn', @axClicked);
+                    'Color', '#AAAACC', 'HitTest', 'off');
         end
-        % masked
-        t_mask = t; t_mask(~mask) = NaN;
-        trace_mask = trace; trace_mask(~mask) = NaN;        
-        hd = shared.myPlot(@plot, hd, 'pawMask', hd.ax, ...
-                        t_mask, trace_mask, ...
-                        'Color', '#0000CC', 'ButtonDownFcn', @axClicked);
+        % plot masked as deep blue
+        if any(mask)
+            t_mask = t; t_mask(~mask) = NaN;
+            trace_mask = trace; trace_mask(~mask) = NaN;        
+            hd = shared.myPlot(@plot, hd, 'pawMask', hd.ax, ...
+                    t_mask, trace_mask, ...
+                    'Color', '#0000CC', 'HitTest', 'off');
+        end
 
-        % threshold lines
-        autoThresh()
+        % plot threshold line
+        thresh = data.gait.paw(pawIdx).thresh.(traceType); %get saved value
+        if isnan(thresh) % default is NaN
+            thresh = mean(trace); % Auto threshold unless manually changed
+        end
+        hd.pawthresh.Value = thresh; % restore threhold display.
         hd = shared.myPlot(@yline, hd, 'pawThresLine', hd.ax, ...
-                        [], hd.pawthresh.Value, ...
+                        [], thresh, ...
                         'b:', 'HitTest', 'off');
 
         % time line
@@ -252,7 +276,7 @@ function fig = gait_viewer(default_path)
         
             % peak and maxspeed
             [peakValue,peakIdx] = findpeaks(trace, ...
-                "MinPeakProminence", std(trace), ...
+                "MinPeakProminence", std(trace, 'omitnan'), ...
                 "MinPeakDistance", MinTimeInterval); 
             invalid = peakValue<pawthres;
             peakIdx(invalid)=[];
@@ -261,8 +285,8 @@ function fig = gait_viewer(default_path)
             data.gait.paw(ii).maxSpeed = peakValue;
             
             % valley
-            [~,valleyIdx] = findpeaks(70-trace, ...
-                'MinPeakProminence', std(trace), ...
+            [~,valleyIdx] = findpeaks(-trace, ...
+                'MinPeakProminence', std(trace, 'omitnan'), ...
                 "MinPeakDistance", MinTimeInterval); 
             invalid = trace(valleyIdx) > pawthres;
             valleyIdx(invalid)=[];
@@ -287,25 +311,26 @@ function fig = gait_viewer(default_path)
             linespec = {'mo', 'LineWidth', 2};
             hd = shared.myPlot(@scatter, hd, 'stepGait', hd.ax, ...
                             stepT, hd.pawMask.YData(stepIdx), ...
-                            linespec{:});
+                            linespec{:}, 'HitTest', 'off');
     
             if data.has('emg')
                 hd = shared.myPlot(@scatter, hd, 'stepEMG', data.emg.hd.ax, ...
-                                stepT, zeros(size(stepT)), linespec{:});
+                                stepT, zeros(size(stepT)), ...
+                                linespec{:}, 'HitTest', 'off');
             end
     
             if data.has('dlc')
                 hd = shared.myPlot(@scatter, hd, 'stepXDLC', data.dlc.hd.ax, ...
-                                stepT, stepX, linespec{:});
+                                stepT, stepX, linespec{:}, 'HitTest', 'off');
                 hd.stepXDLC.Visible = data.dlc.hd.chk_x.Value;
                 hd = shared.myPlot(@scatter, hd, 'stepYDLC', data.dlc.hd.ax, ...
-                                stepT, stepY, linespec{:});
+                                stepT, stepY, linespec{:}, 'HitTest', 'off');
                 hd.stepYDLC.Visible = data.dlc.hd.chk_y.Value;
             end
     
             if data.has('video') 
                 hd = shared.myPlot(@scatter, hd, 'stepVideo', data.video.hd.ax, ...
-                                stepX, stepY, linespec{:});
+                                stepX, stepY, linespec{:}, 'HitTest', 'off');
                 timeWindow = 1;
                 alpha(hd.stepVideo, 2./(1 + exp(abs(stepT-data.currentTime)/timeWindow)));
             end
@@ -329,28 +354,24 @@ function fig = gait_viewer(default_path)
 
     function traceChanged(src,~)
         hd = data.gait.hd;
-        traceType = src.Value;
+        traceType = lower(src.Value);
         switch traceType
-            case 'X'
+            case 'x'
                 ylabel(hd.ax, 'X (cm)')
-            case 'Y'
+            case 'y'
                 ylabel(hd.ax, 'Y (cm)')
-            case 'Speed'
+            case 'speed'
                 ylabel(hd.ax, 'Speed (cm/s)')
         end
+        % change trace for all the paws.
         for ii = 1:numel(hd.pawList.Items)    
-            data.gait.paw(ii).trace = data.gait.paw(ii).(lower(traceType));
+            data.gait.paw(ii).trace = data.gait.paw(ii).(traceType);
             data.gait.paw(ii).traceType = traceType;
         end
+        % recalculate steps for all the paws.
         plotTrace();
         getSteps();
         plotSteps();
-    end
-
-    function autoThresh()
-        hd = data.gait.hd;
-        pawIdx = hd.pawList.Value;
-        hd.pawthresh.Value = mean(data.gait.paw(pawIdx).trace);
     end
 
     function updateInfo()
@@ -380,17 +401,24 @@ function fig = gait_viewer(default_path)
     end
 
     function pawChanged(~,~)
-        getSpeeds();
         plotTrace();
         plotSteps();
     end
 
     function pawThreshChanged(~,~)
         hd = data.gait.hd;
+
+        % save changed value. No more auto value after manually changed
+        pawIdx = hd.pawList.Value;
+        traceType = data.gait.paw(pawIdx).traceType;
+        data.gait.paw(pawIdx).thresh.(traceType) = hd.pawthresh.Value;
+
+        % update threhold line
         data.gait.hd = shared.myPlot(@yline, hd, 'pawThresLine', hd.ax, ...
-                        [], hd.pawthresh.Value, ...
-                        'b:', 'HitTest', 'off');
-        
+                [], hd.pawthresh.Value, ...
+                'b:', 'HitTest', 'off');
+
+        % redo gait analysis.
         gaitAnalysis();
     end
 
@@ -456,6 +484,12 @@ function fig = gait_viewer(default_path)
         data.setZoom(src.Limits);
     end
 
+    function refresh(~,~)
+        data.setZoom(data.gait.t([1 end]));
+
+        updateInfo();
+    end
+
     function exportAxes(~,~)        
         ax = data.gait.hd.ax;
         f = figure();
@@ -477,6 +511,11 @@ function fig = gait_viewer(default_path)
     % close function =================================
     function onClose(src,~)
         hd = data.gait.hd;
+
+        % Clear data and graphic handles first
+        data.gait = struct();
+        data.fig = rmfield(data.fig, 'gait');
+        
         % Clear all the handles and plots;
         field = fields(hd);
         for k=1:length(field)
@@ -489,10 +528,6 @@ function fig = gait_viewer(default_path)
             end
         end
 
-        % Clear data and graphic handles
-        data.gait = struct();
-    
-        data.fig = rmfield(data.fig, 'gait');
         delete(src);  % finally close the GUI
     end
 

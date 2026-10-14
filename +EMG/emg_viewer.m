@@ -8,6 +8,7 @@ function fig = emg_viewer(default_path)
         % EMG viewer window with uigridlayout
         fig = uifigure('Name', 'EMG Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn', @onClose);
+        data.fig(1).emg = fig;
         drawnow
         grid1 = uigridlayout(fig, ...
             'RowHeight', {30, 30, '1x', 30}, ...
@@ -35,7 +36,8 @@ function fig = emg_viewer(default_path)
     
         %% Row 3: Listbox + Axes
         hd.ax = uiaxes(grid1);
-        hold(hd.ax, "on"); axis(hd.ax, 'tight');
+        hold(hd.ax, "on"); 
+        hd.ax.ButtonDownFcn = @axClicked;
         hd.ax.Layout.Row = [3 4]; hd.ax.Layout.Column = 1;
         hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
         xlabel(hd.ax, 'Time (s)'); ylabel(hd.ax, 'Voltage');
@@ -59,7 +61,7 @@ function fig = emg_viewer(default_path)
             'Tooltip','Zoom in');
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
             'Tooltip','Zoom out');
-        uibutton(subgrid2,'Text','⭯','ButtonPushedFcn',@(src,evt)updateInfo(), ...
+        uibutton(subgrid2,'Text','⭯','ButtonPushedFcn',@refresh, ...
             'Tooltip','Refresh');
         uibutton(subgrid2,'Text','[➜','ButtonPushedFcn',@exportAxes, ...
             'Tooltip','Pop out');
@@ -79,6 +81,7 @@ function fig = emg_viewer(default_path)
         % open file----------------
         % == new UI, select the folder, compatible with Open Ephys ===
         pathname = uigetdir(hd.path.Value, 'Select the Directory for EMG data files');
+        drawnow; figure(fig);
         if isequal(pathname, 0), return; end
 
         emgData = EMG.emg_read(pathname);
@@ -299,6 +302,12 @@ function fig = emg_viewer(default_path)
             xlim(hd.ax, newZoom);
             data.currentZoom = newZoom;
         end
+    end
+
+    function refresh(~,~)
+        data.setZoom([0 data.emg.t(end)]);
+
+        updateInfo();
     end
 
     function exportAxes(~,~)        

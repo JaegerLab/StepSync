@@ -13,13 +13,13 @@ function result = sta(emg, emg_t, event_time, varargin)
 %     'method'    - Control method: 'dither' | 'random_time' |
 %                   'isi_shuffle' | 'global' | 'none'     (default: 'dither')
 %     'nRep'      - Repetitions for repeated methods      (default: 100)
-%     'offset'    - Dither max offset in seconds          (default: 2)
-%     'normalize' - Store normalize flag (plot-time only) (default: false)
+%     'offset'    - Dither within [-offset, offset) sec   (default: 1)
+%     'zscore'    - Store zscore flag (plot-time only)    (default: false)
 %     'nStd'      - CI width in std devs                  (default: 3)
 %     'plot'      - false / true / axes / figure handle   (default: false)
 %
 %   Output: flat struct with fields:
-%     t, y, max_lag, method, nRep, offset, normalize, nStd,
+%     t, y, max_lag, method, nRep, offset, zscore, nStd,
 %     random_t, random_mean, random_std, eventNum, sample_rate
 
     %% ── Parse name-value arguments ───────────────────────────────────────
@@ -31,7 +31,7 @@ function result = sta(emg, emg_t, event_time, varargin)
     p.addParameter('method',    'dither', @(x) ischar(x) || isstring(x));
     p.addParameter('nRep',      100,      @(x) isnumeric(x) && isscalar(x) && x > 0);
     p.addParameter('offset',    1,        @(x) isnumeric(x) && isscalar(x) && x > 0);
-    p.addParameter('normalize', false,    @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
+    p.addParameter('zscore',    false,    @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
     p.addParameter('nStd',      3,        @(x) isnumeric(x) && isscalar(x) && x > 0);
     p.addParameter('plot',      false);
     p.parse(emg, emg_t, event_time, varargin{:});
@@ -42,7 +42,7 @@ function result = sta(emg, emg_t, event_time, varargin)
     doControl = ~strcmp(method, 'none');
     nRep      = round(p.Results.nRep);
     offset    = p.Results.offset;
-    normalize = logical(p.Results.normalize);
+    zscore = logical(p.Results.zscore);
     nStd      = p.Results.nStd;
     plotArg   = p.Results.plot;
 
@@ -182,7 +182,7 @@ function result = sta(emg, emg_t, event_time, varargin)
     result.method      = actual_method;   % what was actually computed
     result.nRep        = nRep;
     result.offset      = offset;
-    result.normalize   = normalize;
+    result.zscore      = zscore;
     result.nStd        = nStd;
     result.random_t    = t;
     result.random_mean = random_mean;

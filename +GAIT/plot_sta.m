@@ -12,7 +12,7 @@ function ax = plot_sta(result, target)
 %     • Legend
 %
 %   Normalization:
-%     When result.normalize is true, display as pointwise z-score:
+%     When result.zscore is true, display as pointwise z-score:
 %       y_disp(t) = (y(t) - random_mean(t)) / random_std(t)
 %     This collapses the control mean to 0 and CI to ± nStd for every method.
 %
@@ -40,9 +40,9 @@ function ax = plot_sta(result, target)
     max_lag      = result.max_lag;
     doControl    = ~strcmp(result.method, 'none');
     is_global    = strcmp(result.method, 'global');
-    normalize    = result.normalize && doControl;
+    zscore    = result.zscore && doControl;
 
-    if normalize
+    if zscore
         % Avoid divide-by-zero on flat std (should only happen if std==0 everywhere)
         safe_std = rand_std;
         safe_std(safe_std == 0) = 1;
@@ -66,7 +66,7 @@ function ax = plot_sta(result, target)
         ci_upper = rand_mean_disp + nStd .* rand_std_disp;
         ci_lower = rand_mean_disp - nStd .* rand_std_disp;
 
-        if is_global || normalize || isscalar(ci_upper) || isscalar(ci_lower)
+        if is_global || zscore || isscalar(ci_upper) || isscalar(ci_lower)
             % Flat rectangle to reduce complexity of the graph
             fill_x = max_lag .* [-1 1 1 -1];
             fill_y = [ci_lower(1) ci_lower(1) ci_upper(1) ci_upper(1)];
@@ -110,7 +110,7 @@ function ax = plot_sta(result, target)
 
     % ── Axis labels & legend ──────────────────────────────────────────────
     xlabel(ax, 't (s)');
-    if normalize
+    if zscore
         ylabel(ax, 'Amplitude (std)');
     else
         ylabel(ax, 'Amplitude');

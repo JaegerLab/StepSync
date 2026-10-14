@@ -11,6 +11,9 @@ function hfig = StepSync(default_path)
     if nargin == 0
         default_path = 'E:\Openfield\data';
     end
+    % turn off "ButtonDownFcn" warning when selecting tools
+    s = warning('off', 'MATLAB:modes:mode:InvalidPropertySet');
+    cleanup = onCleanup(@() warning(s)); % restore warning after quitting
     drawGUI(default_path)
 
     function drawGUI(default_path)

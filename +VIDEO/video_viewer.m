@@ -10,6 +10,7 @@ function drawGUI(default_path)
     % Main UI figure with grid layout
     fig = uifigure('Name', 'Video Viewer', 'Position', [100 100 600 600], ...
         'CloseRequestFcn', @onClose);
+    data.fig(1).video = fig;
     % for dragging markers
     fig.WindowButtonDownFcn   = @(src,evt)onMouseDown(src, evt);
     fig.WindowButtonMotionFcn = @(src,evt)onMouseMove(src, evt);
@@ -114,6 +115,7 @@ function openVideo(~,~)
             end
         end
         [file, path] = uigetfile(filename, 'Open Video file');
+        drawnow; figure(fig);
         if isequal(file, 0); return; end
         filename = fullfile(path, file);
         hd.path.Value = filename;
@@ -212,8 +214,10 @@ function updateInfo()
 end
 
 function updateFrameRate(value)
-    data.frameRate = value;
-    notify(data, 'InfoChanged');
+    if data.has('video')
+        data.frameRate = value;
+        notify(data, 'InfoChanged');
+    end
 end
 
 % callback function for frame-by-frame buttons
@@ -279,13 +283,13 @@ function drawDLCMarker()
             hd = shared.myPlot( ...
                 @plot, hd, 'dlcTempMarker', hd.ax, ...
                 tabledlc.temp_x(frameIdx), tabledlc.temp_y(frameIdx), ...
-                'r+', 'LineWidth', 2, 'HitTest','off');
+                'go', 'LineWidth', 2, 'HitTest','off');
         end
 
         % show marker
         hd = shared.myPlot(@plot, hd, 'dlcMarker', hd.ax, ...
                 tabledlc.([bodypart '_x'])(frameIdx), tabledlc.([bodypart '_y'])(frameIdx), ...
-                'g+', 'LineWidth', 2, 'HitTest','off');
+                'c+', 'LineWidth', 2, 'HitTest','off');
         uistack(hd.dlcMarker, "top")
         data.video.hd = hd;
     end

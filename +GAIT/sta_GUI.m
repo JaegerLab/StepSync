@@ -9,9 +9,7 @@ function fig = sta_GUI(mousePos)
 %     • Restore parameters + replot any previous run (no recompute)
 %     • Delete individual runs or clear all history
 %     • Pop the current plot out into a standalone figure
-%
-%   The window handle is stored at data.gait.hd.sta_GUI and cleared
-%   on close so that gait_viewer can use the isfield/isgraphics idiom.
+
 
     data = shared.SessionData.instance();
 
@@ -32,7 +30,7 @@ function fig = sta_GUI(mousePos)
         'ColumnSpacing', 8, ...
         'RowHeight',    {30, '1x', 30});
 
-    %% ── Row 1: max_lag | Control checkbox | Normalize checkbox ───────────
+    %% ── Row 1: max_lag | Control checkbox | zscore checkbox ───────────
     subR1 = uigridlayout(grid1, [1 6], 'Padding', [0 0 0 0], ...
         'ColumnWidth', {100, '1x', 70,80,80,80}, ...
         'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
@@ -55,14 +53,15 @@ function fig = sta_GUI(mousePos)
         'Tooltip', 'Number of repetitions for random control');
 
     hd.editOffset = uieditfield(subR1, 'numeric', ...
-        'Value', 2, ...
+        'Value', 1, ...
         'ValueDisplayFormat', 'Offset: %.1f s', ...
-        'Tooltip', 'Random dither max offset (seconds)');
+        'Tooltip', 'Random dither shift within [-offset, offset) (seconds)');
 
-    hd.chkNormalize = uicheckbox(subR1, ...
-        'Text',  'Normalize', ...
+    hd.chkZscore = uicheckbox(subR1, ...
+        'Text',  'Z-Score', ...
         'Value', false, ...
-        'Tooltip', 'Plot-time z-score normalization (does not change stored data)');
+        'Tooltip', 'Plot-time z-score (does not change stored data)', ...
+        'ValueChangedFcn', @onZscoreChanged);
 
     % ── Plot button ───────────────────────────
     hd.btnPlot = uibutton(subR1, 'Text', 'Plot', ...
@@ -89,13 +88,15 @@ function fig = sta_GUI(mousePos)
         'ValueChangedFcn', @onRunSelected);
 
     uibutton(subR3, 'Text', '🗑️', ...
+        'Tooltip', 'Delete selected', ...
         'ButtonPushedFcn', @onDelete);
 
-    uibutton(subR3, 'Text', '🗑️All', ...
+    uibutton(subR3, 'Text', '⃠', ...
+        'Tooltip', 'Clear all', ...
         'ButtonPushedFcn', @onClearAll);
 
     uibutton(subR3, 'Text', '[➜', ...
-        'Tooltip', 'Pop out to new figure', ...
+        'Tooltip', 'Pop out', ...
         'ButtonPushedFcn', @onPopOut);
 
     % rebuild dropdown menu items if there were history data
@@ -167,7 +168,7 @@ function fig = sta_GUI(mousePos)
         method    = hd.ddMethod.Value;
         nRep      = round(hd.editNRep.Value);
         offset    = hd.editOffset.Value;
-        normalize = hd.chkNormalize.Value;
+        zscore = hd.chkZscore.Value;
         nStd      = 3;   % fixed in spec; could expose later
 
         %% Compute STA
@@ -176,7 +177,7 @@ function fig = sta_GUI(mousePos)
             'method',    method, ...
             'nRep',      nRep, ...
             'offset',    offset, ...
-            'normalize', normalize, ...
+            'zscore',    zscore, ...
             'nStd',      nStd, ...
             'plot',      false);
 
@@ -213,6 +214,28 @@ function fig = sta_GUI(mousePos)
         title(hd.ax, label, 'Interpreter', 'none');
     end
 
+    function onZscoreChanged(src, ~)
+        if isempty(hd.ddRuns.Items)
+            return;
+        end
+        idx = hd.ddRuns.Value;
+        result = data.gait.sta(idx);
+
+        if src.Value ~= result.zscore
+            % change data zscore flag
+            result.zscore = src.Value;
+            data.gait.sta(idx).zscore = src.Value;
+
+            % change plot
+            GAIT.plot_sta(result, hd.ax);
+            
+            % change title
+            label = makeLabel(result);
+            title(hd.ax, label, 'Interpreter', 'none');
+            hd.ddRuns.Items{idx} = label;
+        end
+    end
+
     % ── Dropdown selection: restore params & replot ───────────────────────
     function onRunSelected(src, ~)
         if isempty(src.Items)
@@ -223,16 +246,11 @@ function fig = sta_GUI(mousePos)
 
         % Restore parameter widgets
         hd.editMaxLag.Value  = result.max_lag;
-        hd.chkNormalize.Value = result.normalize;
+        hd.chkZscore.Value = result.zscore;
         hd.editNRep.Value    = result.nRep;
         hd.editOffset.Value  = result.offset;
 
-        % Could be used later when nStd is controllable in GUI
-        % hd.editNStd = result.nStd;
-
-        % Restore method dropdown (use stored method, which may be 'global'
-        % even if user originally requested something else — that is correct
-        % because result.method reflects what was actually computed)
+        % Restore method dropdown
         if ismember(result.method, hd.ddMethod.ItemsData)
             hd.ddMethod.Value = result.method;
         end
@@ -256,8 +274,9 @@ function fig = sta_GUI(mousePos)
         keep(selIdx) = false;
         data.gait.sta = data.gait.sta(keep);
 
-        % Rebuild dropdown (indices must be renumbered)
-        rebuildDropdown();
+        % Remove from dropdown menu
+        hd.ddRuns.Items(selIdx)=[];
+        hd.ddRuns.ItemsData(end)=[];
 
         % Select adjacent run or blank axis
         n = numel(data.gait.sta);
@@ -310,7 +329,7 @@ function fig = sta_GUI(mousePos)
         % Control unchecked → grey everything control-related
         % setEnable(hd.ddMethod,     ctrlOn);
         setEnable(hd.editNRep,     ctrlOn && ~isGlobal);
-        setEnable(hd.chkNormalize, ctrlOn);
+        setEnable(hd.chkZscore, ctrlOn);
         setEnable(hd.editOffset,   ctrlOn && strcmp(method, 'dither'));
     end
 
@@ -325,8 +344,8 @@ function fig = sta_GUI(mousePos)
     function label = makeLabel(result)
         label = [result.pawName ', ' result.stepName ...
                  ' on ' result.traceName ', ' result.emgChanName];
-        if result.normalize && ~strcmp(result.method, 'none')
-            label = [label ', normalized'];
+        if result.zscore && ~strcmp(result.method, 'none')
+            label = [label ', z-score'];
         end
     end
 

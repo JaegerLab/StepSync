@@ -85,6 +85,7 @@ function fig = emg_viewer(default_path)
         if isequal(pathname, 0), return; end
 
         emgData = EMG.emg_read(pathname);
+        drawnow; figure(fig); % Return from reader dialogs (including Open Ephys TTL selection).
 
         if isfield(hd, 'prepGUI') && isgraphics(hd.prepGUI), close(hd.prepGUI); end
         % Replace recording-specific state, retaining only the live UI.
@@ -100,8 +101,19 @@ function fig = emg_viewer(default_path)
             digital = emgData.dig_in_data;
             channel = 1;
             if size(digital, 2) > 1
+                labels = cell(1, size(digital,2));
+                for k = 1:size(digital,2)
+                    times = emgData.t(1 + find(diff(digital(:,k)) > 0.5));
+                    labels{k} = sprintf('Ch %d: %d TTL', k, numel(times));
+                    intervals = diff(times);
+                    intervals = intervals(isfinite(intervals) & intervals > 0);
+                    if ~isempty(intervals)
+                        labels{k} = sprintf('%s, %.3g Hz', labels{k}, 1/median(intervals));
+                    end
+                end
                 [channel, ok] = listdlg('PromptString', 'Select camera TTL channel:', ...
-                    'ListString', cellstr(string(1:size(digital,2))), 'SelectionMode', 'single');
+                    'ListString', labels, 'SelectionMode', 'single', 'ListSize', [340 200]);
+                drawnow; figure(fig);
                 if ~ok, channel = []; end
             end
             if ~isempty(channel)

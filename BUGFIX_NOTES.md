@@ -33,14 +33,14 @@
 | 18 | Use the same origin for analog/TTL time; choose a camera TTL line. Upstream Open Ephys source was inspected for field names. |
 | 19 | Close/reset existing modules when replacing a session; empty viewers tolerate data notifications. |
 | 20 | Centralize validated rate edits and notify all viewers. |
-| 21 | Clip legacy onset search and filter NaN indices. Correction to original report: `valley` itself remains in frame units; only the output field is converted to seconds, so the alleged fractional stride indexing did not need a fix. |
+| 21 | Removed the unused legacy gait-analysis function. Correction to original report: `valley` itself remained in frame units; the alleged fractional stride indexing was not a defect. |
 | 22 | Alternative correction routines were already deleted upstream; not reintroduced. |
-| 23 | Replaced the syntactically unfinished head-fixed prototype with an explicit unsupported-API error. The GUI remains supported; implementing a separate batch API is deferred for discussion. |
+| 23 | Removed the stale head-fixed prototype after confirming it is outside the application call chain. Head-fixed analysis remains in the active GUI. |
 | 24 | Reconstruct SLEAP frame gaps; select one track rather than flattening tracks. |
 | 25 | Playback follows elapsed wall time and acquisition rate, dropping display frames when rendering cannot keep up. |
 | 26 | Validate positive finite rate overrides; use valid TTL/video fallback. |
 | 27 | Handle full-length/oversized smoothing windows and localize missing samples instead of poisoning the entire tail. |
-| 28 | Store per-sample Kalman covariances for the RTS backward pass. |
+| 28 | Removed the unused Kalman smoother and its test. |
 
 ## New refactor conflicts
 
@@ -57,3 +57,18 @@ graphics behavior and actual recording readers still need execution in the lab's
 MATLAB environment before merging into the main branch or interpreting changed
 scientific outputs. In particular, STA boundary normalization intentionally changes
 edge results, and imported-speed interpolation changes previously misaligned masks.
+
+## Unused-file cleanup
+
+At the owner's request, removed all eight files outside the application call chain:
+
+- `+EMG/kalman_smooth.m`
+- `+EMG/preview.m`
+- `+GAIT/gait_analysis.m`
+- `+GAIT/gait_analysis_headfix.m`
+- `+VIDEO/hist.m`
+- `+shared/dev_reload_session.m`
+- `+shared/find_index.m`
+- `+shared/nan_index.m`
+
+Removed tests targeting the deleted head-fixed prototype and Kalman smoother.

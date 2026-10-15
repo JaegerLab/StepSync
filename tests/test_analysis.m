@@ -85,43 +85,9 @@ verifyEqual(testCase,t.paw_x([1 3]),[1;3]);
 verifyEqual(testCase,t.Properties.UserData,{'paw'});
 end
 
-function testHeadfixPrototypeFailsClearly(testCase)
-verifyError(testCase,@()GAIT.gait_analysis_headfix(), 'GAIT:headfix:notImplemented');
-end
 
 function testSmoothingMissingSamplesDoesNotPoisonTail(testCase)
 x = (1:30)'; x(5) = NaN;
 y = shared.fastsmooth(x,3);
 verifyTrue(testCase,all(isfinite(y(10:end))));
-end
-
-function testKalmanMatchesBatchGaussianConditioning(testCase)
-% Independent batch posterior for the same linear model, including missing observations.
-A = [1 0 1 0; 0 1 0 1; 0 0 1 0; 0 0 0 1];
-Q = 0.01*eye(4); N = 6;
-C = zeros(4*N);
-for i = 1:N
-    row = (i-1)*4+(1:4);
-    if i == 1
-        C(row,row) = A*A'+Q;
-    else
-        prev = (i-2)*4+(1:4);
-        C(row,row) = A*C(prev,prev)*A'+Q;
-        for j = 1:i-1
-            col = (j-1)*4+(1:4);
-            C(row,col) = A*C(prev,col);
-            C(col,row) = C(row,col)';
-        end
-    end
-end
-x = [1;2;4;5;6;8]; y = [2;1;3;5;4;7]; bad = [false;true;false;true;false;false];
-observations = []; values = [];
-for i = find(~bad)'
-    observations = [observations (i-1)*4+[1 2]]; %#ok<AGROW>
-    values = [values; x(i); y(i)]; %#ok<AGROW>
-end
-posterior = C(:,observations)/(C(observations,observations)+5*eye(numel(observations)))*values;
-[xs,ys] = EMG.kalman_smooth(x,y,bad);
-verifyEqual(testCase,xs,posterior(1:4:end),'AbsTol',1e-10);
-verifyEqual(testCase,ys,posterior(2:4:end),'AbsTol',1e-10);
 end

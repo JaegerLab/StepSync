@@ -236,6 +236,8 @@ function fig = gait_viewer(default_path)
 
             traceType = lower(hd.trace.Value);
             trace = data.gait.paw(pawIdx).(traceType);
+            data.gait.paw(pawIdx).traceType = traceType;
+            
             if isfield(data.gait, 'mask')
                 trace(~data.gait.mask) = NaN;
             end

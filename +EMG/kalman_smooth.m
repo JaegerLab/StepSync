@@ -17,12 +17,15 @@ R = 5 * eye(2);      % measurement noise
 % Initialize
 x_est = zeros(4,N);
 P = eye(4);
+P_filtered = zeros(4,4,N);
+P_predicted = zeros(4,4,N);
 
 % Forward pass (Kalman filter)
 for t = 1:N
     % Prediction
     x_pred = A * x_est(:,max(t-1,1));
     P_pred = A * P * A' + Q;
+    P_predicted(:,:,t) = P_pred;
 
     if badMask(t)
         % No measurement update
@@ -35,13 +38,13 @@ for t = 1:N
         x_est(:,t) = x_pred + K * (z - H * x_pred);
         P = (eye(4) - K * H) * P_pred;
     end
+    P_filtered(:,:,t) = P;
 end
 
 % Backward pass (RTS smoother)
 x_smooth = x_est;
 for t = N-1:-1:1
-    P_pred = A * P * A' + Q;
-    C = P * A' / P_pred;
+    C = P_filtered(:,:,t) * A' / P_predicted(:,:,t+1);
     x_smooth(:,t) = x_est(:,t) + C * (x_smooth(:,t+1) - A * x_est(:,t));
 end
 

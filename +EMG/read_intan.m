@@ -18,10 +18,14 @@ if ischar(files), files = {files}; end  % ensure cell
 if isstruct(files)
     files = arrayfun(@(x)fullfile(x.folder,x.name), files, 'UniformOutput', false);
 end
+supported = cellfun(@(f)endsWith(lower(f), {'.rhd','.rhs'}), files, 'UniformOutput', false);
+files = files(cellfun(@any, supported));
 file_num = length(files);
+if file_num == 0, error('EMG:files', 'No RHD or RHS files were selected.'); end
 
 p = 0; % pointer for the end of data in pre-allocated space.
 hd = waitbar(0, 'Please wait...', 'Name', 'Reading files');
+cleanup = onCleanup(@()delete(hd)); %#ok<NASGU>
 ht = findall(hd,'Type','text');
 set(ht,'Interpreter','none');
 
@@ -30,6 +34,7 @@ for ii=1:file_num
 
     % disp(filename)
     [~, filename, ext] = fileparts(fullname);
+    ext = lower(ext);
 
     if ~exist(fullname,"file"), error('File not found'); end
     
@@ -45,6 +50,22 @@ for ii=1:file_num
         continue
     end
     
+    if ~isfield(data1, 'analog_data') || size(data1.analog_data,1) ~= numel(data1.t)
+        error('EMG:channels', 'File has no amplifier data or incompatible timestamps: %s', fullname);
+    end
+    if p > 0
+        if data1.sample_rate ~= data.sample_rate || ...
+                ~isequal({data1.analog_channels.custom_channel_name}, data.analog_channels)
+            error('EMG:schema', 'Sample rate or amplifier channels changed between files.');
+        end
+        for field = {'digital_data','dig_in_data'}
+            name = field{1};
+            if isfield(data, name) ~= isfield(data1, name) || ...
+                    (isfield(data1, name) && size(data.(name),2) ~= size(data1.(name),2))
+                error('EMG:schema', 'Input channel layout changed between files: %s', name);
+            end
+        end
+    end
     if p==0
         % 1st file
         % pre-allocate space to speed up reading

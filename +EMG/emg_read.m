@@ -9,11 +9,13 @@ if nargin==0
 end
 
 files = dir(folder); % structure of files
+files = files(~[files.isdir]);
+entries = dir(folder);
 
 if any(contains({files.name},'.rh'))
     % Intan
     data = EMG.read_intan(files);
-elseif any(contains({files.name},'Record Node')) 
+elseif any(contains({entries.name},'Record Node'))
     % Open Ephys
     % go to https://github.com/open-ephys/open-ephys-matlab-tools
     % for documentations 

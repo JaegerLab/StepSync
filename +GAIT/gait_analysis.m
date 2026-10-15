@@ -94,15 +94,16 @@ for ii = 1:4
     % 2 steps, find the point crossing threshold, then find the 0 before
     pawup = find(speed(1:end-1)<=pawthres & speed(2:end)>pawthres);
     for k=1:length(pawup)
-        range = pawup(k)+(-MaxTimeInterval:0);
+        range = max(1,pawup(k)-MaxTimeInterval):pawup(k);
         idx = find(speed(range) <= MinSpeedThresh, 1,"last");
         if idx
-            pawup(k) = pawup(k) - MaxTimeInterval + idx;
+            pawup(k) = range(idx);
         else 
             pawup(k) = NaN;
         end
     end
-    pawup(body_speed(pawup)<bodythres)=NaN;
+    valid = find(isfinite(pawup));
+    pawup(valid(body_speed(pawup(valid)) < bodythres)) = NaN;
 
     % paw down
     pawdown = find(speed(1:end-1)>pawthres & speed(2:end)<=pawthres)+1;  

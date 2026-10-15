@@ -42,7 +42,8 @@ end
 if isfield(options, 'DownSampleRate')
     % smooth
     waitbar(1/3, hd, 'Smoothing')
-    downsample_factor = round(fs / options.DownSampleRate);
+    validateattributes(options.DownSampleRate, {'numeric'}, {'scalar','real','finite','positive','<=',fs});
+    downsample_factor = max(1, round(fs / options.DownSampleRate));
     smoothWidth = round(2.5 * downsample_factor);
     new_data = shared.fastsmooth(new_data, smoothWidth,1,1);
 

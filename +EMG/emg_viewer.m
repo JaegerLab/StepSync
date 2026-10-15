@@ -86,6 +86,9 @@ function fig = emg_viewer(default_path)
 
         emgData = EMG.emg_read(pathname);
 
+        if isfield(hd, 'prepGUI') && isgraphics(hd.prepGUI), close(hd.prepGUI); end
+        % Replace recording-specific state, retaining only the live UI.
+        data.emg = struct('hd', hd);
         % Update state ---------------
         data.emg.filename = emgData.files;
         data.emg.display_name = pathname;
@@ -94,8 +97,17 @@ function fig = emg_viewer(default_path)
         data.emg.sample_rate = emgData.sample_rate;
         if isfield(emgData, 'dig_in_data')
             % Intan
-            data.emg.trigger.data = emgData.dig_in_data;
-            data.emg.trigger.time = emgData.t(1 + find(diff(emgData.dig_in_data)>0.5));
+            digital = emgData.dig_in_data;
+            channel = 1;
+            if size(digital, 2) > 1
+                [channel, ok] = listdlg('PromptString', 'Select camera TTL channel:', ...
+                    'ListString', cellstr(string(1:size(digital,2))), 'SelectionMode', 'single');
+                if ~ok, channel = []; end
+            end
+            if ~isempty(channel)
+                data.emg.trigger.data = digital(:,channel);
+                data.emg.trigger.time = emgData.t(1 + find(diff(digital(:,channel)) > 0.5));
+            end
         elseif isfield(emgData, 'trigger')
             % Open Ephys
             data.emg.trigger = emgData.trigger;
@@ -105,8 +117,8 @@ function fig = emg_viewer(default_path)
         hd.datatype.Items = "Raw";
         hd.sortby.Enable = 'off';
 
-        updateInfo();
-        updatePlots();
+        notify(data, 'InfoChanged');
+        notify(data, 'DataChanged');
     end
 
     % separate reading and updating info, because reading is slow, and
@@ -137,9 +149,8 @@ function fig = emg_viewer(default_path)
     end
 
     function pushFrameRate(~,~)
-        if isfield(data.emg, 'trigger')
-            data.frameRate = data.emg.trigger.freq;
-            notify(data, 'InfoChanged');
+        if isfield(data.emg, 'trigger') && isfinite(data.emg.trigger.freq) && data.emg.trigger.freq > 0
+            data.setFrameRate(data.emg.trigger.freq);
         end
     end
 
@@ -207,8 +218,9 @@ function fig = emg_viewer(default_path)
         end
         % select file
         [file, path] = uigetfile(default_file, 'Select Channel Mapping File', 'MultiSelect', 'off');
+        if isequal(path,0), return; end
         filename = fullfile(path, file);
-        if isequal(path,0) || ~exist(filename, "file"), return; end
+        if ~exist(filename, "file"), return; end
         
         % read channel mapping csv file
         ch_mapping = readtable(filename);
@@ -303,6 +315,7 @@ function fig = emg_viewer(default_path)
         if data.has('emg')
             newZoom(1)=max([0 newZoom(1)]);
             newZoom(2)=min([newZoom(2), data.emg.t(end)]);
+            if newZoom(2) <= newZoom(1), return; end
             xlim(hd.ax, newZoom);
             data.currentZoom = newZoom;
         end

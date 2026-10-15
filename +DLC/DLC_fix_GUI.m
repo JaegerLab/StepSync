@@ -61,6 +61,7 @@ function fig = DLC_fix_GUI(mousePos)
         % segments, for display and click editing in dlc_viewer
         data.dlc.seg = seg;
         data.dlc.seg_bodypart = field;
+        data.dlc.previewParameters = [jumpthresh.Value winwidth.Value];
         
         % plot comparison
         notify(data, 'DataChanged');
@@ -69,7 +70,11 @@ function fig = DLC_fix_GUI(mousePos)
     function saveAs()
         if ~data.has('dlc'), return; end
 
-        if ~ismember('temp_x', data.dlc.table.Properties.VariableNames)
+        if ~ismember('temp_x', data.dlc.table.Properties.VariableNames) || ...
+                ~isfield(data.dlc, 'seg_bodypart') || ...
+                ~strcmp(data.dlc.seg_bodypart, data.dlc.hd.list_bodyparts.Value) || ...
+                ~isfield(data.dlc, 'previewParameters') || ...
+                ~isequal(data.dlc.previewParameters, [jumpthresh.Value winwidth.Value])
             preview;
         end
 
@@ -149,7 +154,7 @@ function fig = DLC_fix_GUI(mousePos)
     function onClose(src, ~)
         if data.has('dlc')
             if ismember('temp_x', data.dlc.table.Properties.VariableNames)
-                data.dlc.table = removevars(data.dlc.table, {'temp_x', 'temp_y'});
+                data.dlc.table = removevars(data.dlc.table, {'temp_x', 'temp_y', 'temp_likelihood'});
             end
             removeTempPlots();
             notify(data, 'DataChanged');

@@ -28,11 +28,24 @@ if any(adc_chans)
 end
 
 % get trigger event time
-triggers = session.recordNodes{1}.recordings{1}.ttlEvents(key_name);
-data.trigger.time = triggers.timestamp(triggers.state);
+events = session.recordNodes{1}.recordings{1}.ttlEvents;
+if isKey(events, key_name)
+    triggers = events(key_name);
+    rising = triggers.state == 1;
+    lines = unique(triggers.line(rising));
+    if numel(lines) > 1
+        [idx, ok] = listdlg('PromptString', 'Select camera TTL line:', ...
+            'ListString', cellstr(string(lines)), 'SelectionMode', 'single');
+        if ~ok, lines = []; else, lines = lines(idx); end
+    end
+    if ~isempty(lines)
+        data.trigger.time = triggers.timestamp(rising & triggers.line == lines(1)) ...
+            - recording.metadata.startTimestamp;
+    end
+end
 
 % get time sample
-data.t = recording.timestamps - recording.metadata.startTimestamp;
+data.t = recording.timestamps(:) - recording.metadata.startTimestamp;
 
 % save files
 data.files = files;

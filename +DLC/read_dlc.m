@@ -48,7 +48,6 @@ switch ext
             tabledlc = DLC.read_csv(filename);
         end
     case '.h5'
-        % Indy's data format
         tabledlc = DLC.read_h5(filename);
     case '.mat'
         tabledlc = DLC.read_mat(filename); 

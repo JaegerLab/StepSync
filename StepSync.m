@@ -78,6 +78,9 @@ function hfig = StepSync(default_path)
         savedata = load(filename);
         
         hd.path.Value = savedata.defaultPath;
+        data.frameRate = savedata.frameRate;
+        data.currentTime = savedata.currentTime;
+        data.currentZoom = savedata.currentZoom;
         modules = fieldnames(savedata.figures);
         for k = 1:length(modules)
             module = modules{k};

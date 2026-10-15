@@ -475,17 +475,17 @@ data.sample_rate=frequency_parameters.amplifier_sample_rate;
 if (data_present)
     data.t=t';
     if (num_amplifier_channels > 0)
-        data.amplifier_channels = amplifier_channels;
-        data.amplifier_data = amplifier_data';
+        data.analog_channels = amplifier_channels;
+        data.analog_data = amplifier_data';
     end
 
     if (num_board_adc_channels > 0)
-        data.board_adc_channels=board_adc_channels;
-        data.board_adc_data = board_adc_data';
+        data.digital_channels=board_adc_channels;
+        data.digital_data = board_adc_data';
     end
     if (num_board_dig_in_channels > 0)
-        data.board_dig_in_channels=board_dig_in_channels;
-        data.board_dig_in_data=board_dig_in_data';
+        data.dig_in_channels=board_dig_in_channels;
+        data.dig_in_data=board_dig_in_data';
     end
 end
 

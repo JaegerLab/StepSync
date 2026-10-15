@@ -1,4 +1,4 @@
-function [bodyparts, scorer, coords]=DLC_read_h5_bodyparts(filename)
+function [bodyparts, scorer, coords]=read_h5_bodyparts(filename)
 % extract the bodyparts labels from a DeepLabCut h5 file
 % syntax: 
 %    bodyparts = read_dlc_h5_bodyparts(filename)

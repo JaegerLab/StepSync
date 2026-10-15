@@ -1,4 +1,4 @@
-function tabledlc = DLC_read_h5(filename)
+function tabledlc = read_h5(filename)
 % read deeplabcut h5 files into a table. with proper variable names
 % syntax: marker = read_dlc_h5(filename)
 % ------------------------
@@ -9,7 +9,7 @@ data = h5read(filename,'/df_with_missing/table');
 tabledlc=array2table(data.values_block_0');
 
 % read headers in meta info.
-[bodyparts, scorer ,coords] = DLC_read_h5_bodyparts(filename);
+[bodyparts, scorer ,coords] = read_h5_bodyparts(filename);
 % replace illegal characters
 bodyparts=strrep(bodyparts,'-','_');
 % repeat each bodyparts 3 times, add suffix _x,y,likelihood to the end.

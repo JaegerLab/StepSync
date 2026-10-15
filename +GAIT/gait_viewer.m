@@ -123,6 +123,7 @@ function fig = gait_viewer(default_path)
             data.gait.paw(ii).name = pawName;
             data.gait.paw(ii).raw_x = table_dlc.([pawName '_x']);
             data.gait.paw(ii).raw_y = table_dlc.([pawName '_y']);
+            data.gait.paw(ii).thresh = struct('x',NaN,'y',NaN,'speed',NaN);
         end
 
         % enable Steps
@@ -159,7 +160,6 @@ function fig = gait_viewer(default_path)
 
             data.gait.paw(ii).trace = data.gait.paw(ii).(traceType);
             data.gait.paw(ii).traceType = traceType;
-            data.gait.paw(ii).thresh = struct('x',NaN,'y',NaN,'speed',NaN);
         end
         % reconstruct t
         data.gait.t = (1:length(paw.x))'./hd.frameRate.Value;
@@ -225,7 +225,6 @@ function fig = gait_viewer(default_path)
 
     function getSteps()
         hd = data.gait.hd;
-        pawthres = hd.pawthresh.Value;
 
         MinTimeInterval = round(hd.minTimeInterval.Value*data.getFrameRate());
         MaxRestingSpeed = 2.5;
@@ -237,13 +236,18 @@ function fig = gait_viewer(default_path)
                 trace(~data.gait.mask) = NaN;
             end
             
+            thresh = data.gait.paw(ii).thresh.(traceType); %get saved value
+            if isnan(thresh) % default is NaN
+                thresh = mean(trace); % Auto threshold unless manually changed
+            end
+
             % find the first index of each no move period.
             % insert noMove to break up the non-continuous pawups and pawdowns.
             noMoveIdx = find(diff(~data.gait.mask)==1) + 1 ;
             data.gait.paw(ii).noMove = noMoveIdx;
 
             % rising 
-            riseIdx = find(trace(1:end-1)<=pawthres & trace(2:end)>pawthres);
+            riseIdx = find(trace(1:end-1)<=thresh & trace(2:end)>thresh);
             data.gait.paw(ii).rising = riseIdx;
             % find the point almost zero BEFORE the threshold-crossing point
             for k=1:length(riseIdx)
@@ -259,7 +263,7 @@ function fig = gait_viewer(default_path)
             data.gait.paw(ii).onset = unique(riseIdx(~isnan(riseIdx)));
 
             % falling
-            fallIdx = find(trace(1:end-1)>pawthres & trace(2:end)<=pawthres)+1;
+            fallIdx = find(trace(1:end-1)>thresh & trace(2:end)<=thresh)+1;
             data.gait.paw(ii).falling = fallIdx;
             % find the point almost zero AFTER the threshold-crossing point
             for k=1:length(fallIdx)
@@ -278,7 +282,7 @@ function fig = gait_viewer(default_path)
             [peakValue,peakIdx] = findpeaks(trace, ...
                 "MinPeakProminence", std(trace, 'omitnan'), ...
                 "MinPeakDistance", MinTimeInterval); 
-            invalid = peakValue<pawthres;
+            invalid = peakValue<thresh;
             peakIdx(invalid)=[];
             peakValue(invalid)=[];
             data.gait.paw(ii).peak = peakIdx;
@@ -288,7 +292,7 @@ function fig = gait_viewer(default_path)
             [~,valleyIdx] = findpeaks(-trace, ...
                 'MinPeakProminence', std(trace, 'omitnan'), ...
                 "MinPeakDistance", MinTimeInterval); 
-            invalid = trace(valleyIdx) > pawthres;
+            invalid = trace(valleyIdx) > thresh;
             valleyIdx(invalid)=[];
             data.gait.paw(ii).valley = valleyIdx;
         end

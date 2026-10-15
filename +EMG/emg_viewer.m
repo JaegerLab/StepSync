@@ -95,6 +95,7 @@ function fig = emg_viewer(default_path)
         if isfield(emgData, 'dig_in_data')
             % Intan
             data.emg.trigger.data = emgData.dig_in_data;
+            data.emg.trigger.time = emgData.t(1 + find(diff(emgData.dig_in_data)>0.5));
         elseif isfield(emgData, 'trigger')
             % Open Ephys
             data.emg.trigger = emgData.trigger;
@@ -114,13 +115,14 @@ function fig = emg_viewer(default_path)
         if ~data.has('emg'); return; end
         
         hd = data.emg.hd;
-        % trigger time
+        
         if isfield(data.emg, 'trigger')
-            if ~isfield(data.emg.trigger, 'time')
-                data.emg.trigger.time = data.emg.t(1 + find(diff(data.emg.trigger.data)>0.5));
-            end
             data.emg.trigger.freq = 1/median(diff(data.emg.trigger.time));
             data.emg.trigger.number = length(data.emg.trigger.time);
+            triggerInfo = sprintf('Trigger#: %d, Freq: %.2f Hz', ...
+                data.emg.trigger.number, data.emg.trigger.freq);
+        else
+            triggerInfo = "";
         end
 
         % Update UI -------------------
@@ -129,14 +131,16 @@ function fig = emg_viewer(default_path)
         hd.chanList.ItemsData = 1:length(data.emg.analog_channels);
 
         hd.info.Text = sprintf( ...
-            'Rate: %d Hz, Length: %.2f s\nTrigger#: %d, Freq: %.2f Hz', ...
+            'Rate: %d Hz, Length: %.2f s\n%s', ...
             data.emg.sample_rate, data.emg.t(end), ...
-            data.emg.trigger.number, data.emg.trigger.freq);
+            triggerInfo);
     end
 
     function pushFrameRate(~,~)
-        data.frameRate = data.emg.trigger.freq;
-        notify(data, 'InfoChanged');
+        if isfield(data.emg, 'trigger')
+            data.frameRate = data.emg.trigger.freq;
+            notify(data, 'InfoChanged');
+        end
     end
 
     %% main update

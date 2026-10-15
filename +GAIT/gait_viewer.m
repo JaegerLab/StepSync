@@ -144,7 +144,7 @@ function fig = gait_viewer(default_path)
         hd = data.gait.hd;
         hd.frameRate.Value = data.getFrameRate;
         data.gait.speedFactor = hd.frameRate.Value / hd.resolution.Value;
-        traceType = lower(hd.trace.Value);
+        % traceType = lower(hd.trace.Value);
 
         for ii = 1:numel(hd.pawList.Items)    
             paw = data.gait.paw(ii);
@@ -158,8 +158,8 @@ function fig = gait_viewer(default_path)
                 GAIT.smooth_speed(paw.raw_x, paw.raw_y, 3) .* ...
                 data.gait.speedFactor;
 
-            data.gait.paw(ii).trace = data.gait.paw(ii).(traceType);
-            data.gait.paw(ii).traceType = traceType;
+            % data.gait.paw(ii).trace = data.gait.paw(ii).(traceType);
+            % data.gait.paw(ii).traceType = traceType;
         end
         % reconstruct t
         data.gait.t = (1:length(paw.x))'./hd.frameRate.Value;
@@ -172,8 +172,8 @@ function fig = gait_viewer(default_path)
         % get trace
         pawIdx = hd.pawList.Value;
         t = data.gait.t;
-        trace = data.gait.paw(pawIdx).trace;
-        traceType = data.gait.paw(pawIdx).traceType;
+        traceType = lower(hd.trace.Value);
+        trace = data.gait.paw(pawIdx).(traceType);
 
         % get mask
         if isfield(data.gait, 'maskTemp')
@@ -230,13 +230,17 @@ function fig = gait_viewer(default_path)
         MaxRestingSpeed = 2.5;
         % MaxSpeedLimit = 50;
 
-        for ii = 1:numel(data.gait.paw)
-            trace = data.gait.paw(ii).trace;
+        % only calculate the current paw steps instead of all paws.
+        pawIdx = hd.pawList.Value;
+        % for ii = 1:numel(data.gait.paw)
+
+            traceType = lower(hd.trace.Value);
+            trace = data.gait.paw(pawIdx).(traceType);
             if isfield(data.gait, 'mask')
                 trace(~data.gait.mask) = NaN;
             end
             
-            thresh = data.gait.paw(ii).thresh.(traceType); %get saved value
+            thresh = data.gait.paw(pawIdx).thresh.(traceType); %get saved value
             if isnan(thresh) % default is NaN
                 thresh = mean(trace); % Auto threshold unless manually changed
             end
@@ -244,11 +248,11 @@ function fig = gait_viewer(default_path)
             % find the first index of each no move period.
             % insert noMove to break up the non-continuous pawups and pawdowns.
             noMoveIdx = find(diff(~data.gait.mask)==1) + 1 ;
-            data.gait.paw(ii).noMove = noMoveIdx;
+            data.gait.paw(pawIdx).noMove = noMoveIdx;
 
             % rising 
             riseIdx = find(trace(1:end-1)<=thresh & trace(2:end)>thresh);
-            data.gait.paw(ii).rising = riseIdx;
+            data.gait.paw(pawIdx).rising = riseIdx;
             % find the point almost zero BEFORE the threshold-crossing point
             for k=1:length(riseIdx)
                 range = riseIdx(k)+(-MinTimeInterval:0);
@@ -260,11 +264,11 @@ function fig = gait_viewer(default_path)
                     riseIdx(k) = NaN;
                 end
             end
-            data.gait.paw(ii).onset = unique(riseIdx(~isnan(riseIdx)));
+            data.gait.paw(pawIdx).onset = unique(riseIdx(~isnan(riseIdx)));
 
             % falling
             fallIdx = find(trace(1:end-1)>thresh & trace(2:end)<=thresh)+1;
-            data.gait.paw(ii).falling = fallIdx;
+            data.gait.paw(pawIdx).falling = fallIdx;
             % find the point almost zero AFTER the threshold-crossing point
             for k=1:length(fallIdx)
                 range = fallIdx(k)+(0:MinTimeInterval);
@@ -276,7 +280,7 @@ function fig = gait_viewer(default_path)
                     fallIdx(k) = NaN;
                 end
             end
-            data.gait.paw(ii).offset = unique(fallIdx(~isnan(fallIdx)));
+            data.gait.paw(pawIdx).offset = unique(fallIdx(~isnan(fallIdx)));
         
             % peak and maxspeed
             [peakValue,peakIdx] = findpeaks(trace, ...
@@ -285,8 +289,8 @@ function fig = gait_viewer(default_path)
             invalid = peakValue<thresh;
             peakIdx(invalid)=[];
             peakValue(invalid)=[];
-            data.gait.paw(ii).peak = peakIdx;
-            data.gait.paw(ii).maxSpeed = peakValue;
+            data.gait.paw(pawIdx).peak = peakIdx;
+            data.gait.paw(pawIdx).maxSpeed = peakValue;
             
             % valley
             [~,valleyIdx] = findpeaks(-trace, ...
@@ -294,8 +298,8 @@ function fig = gait_viewer(default_path)
                 "MinPeakDistance", MinTimeInterval); 
             invalid = trace(valleyIdx) > thresh;
             valleyIdx(invalid)=[];
-            data.gait.paw(ii).valley = valleyIdx;
-        end
+            data.gait.paw(pawIdx).valley = valleyIdx;
+        % end
     end
 
     function plotSteps()
@@ -367,11 +371,13 @@ function fig = gait_viewer(default_path)
             case 'speed'
                 ylabel(hd.ax, 'Speed (cm/s)')
         end
-        % change trace for all the paws.
-        for ii = 1:numel(hd.pawList.Items)    
-            data.gait.paw(ii).trace = data.gait.paw(ii).(traceType);
-            data.gait.paw(ii).traceType = traceType;
-        end
+
+        % % change trace for all the paws.
+        % for ii = 1:numel(hd.pawList.Items)    
+        %     data.gait.paw(ii).trace = data.gait.paw(ii).(traceType);
+        %     data.gait.paw(ii).traceType = traceType;
+        % end
+
         % recalculate steps for all the paws.
         plotTrace();
         getSteps();
@@ -387,12 +393,6 @@ function fig = gait_viewer(default_path)
         end
     end
 
-    function gaitAnalysis()
-        % getSpeeds();
-        getSteps();
-        plotSteps();
-    end
-
     function openSTA(~, ~)
         mousePos = get(0, 'PointerLocation');
         hd = data.gait.hd;
@@ -406,6 +406,7 @@ function fig = gait_viewer(default_path)
 
     function pawChanged(~,~)
         plotTrace();
+        getSteps();
         plotSteps();
     end
 
@@ -423,7 +424,8 @@ function fig = gait_viewer(default_path)
                 'b:', 'HitTest', 'off');
 
         % redo gait analysis.
-        gaitAnalysis();
+        getSteps();
+        plotSteps();
     end
 
     function stepChanged(~,~)

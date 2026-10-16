@@ -34,8 +34,18 @@ if isKey(events, key_name)
     rising = triggers.state == 1;
     lines = unique(triggers.line(rising));
     if numel(lines) > 1
+        labels = cell(numel(lines),1);
+        for k = 1:numel(lines)
+            times = triggers.timestamp(rising & triggers.line == lines(k));
+            labels{k} = sprintf('Ch %d: %d TTL', lines(k), numel(times));
+            intervals = diff(times);
+            intervals = intervals(isfinite(intervals) & intervals > 0);
+            if ~isempty(intervals)
+                labels{k} = sprintf('%s, %.3g Hz', labels{k}, 1/median(intervals));
+            end
+        end
         [idx, ok] = listdlg('PromptString', 'Select camera TTL line:', ...
-            'ListString', cellstr(string(lines)), 'SelectionMode', 'single');
+            'ListString', labels, 'SelectionMode', 'single', 'ListSize', [340 200]);
         if ~ok, lines = []; else, lines = lines(idx); end
     end
     if ~isempty(lines)

@@ -10,8 +10,7 @@ assertSuccess(results)
 
 The numerical tests cover event boundaries and masks, independent thresholds,
 STA time origins, duplicates and missing samples, recording boundaries and
-random controls, smoothing limits, sparse SLEAP frames, and RTS smoothing against
-an independent batch Gaussian posterior.
+random controls, smoothing limits, and sparse SLEAP frames.
 
 Close StepSync before running the desktop integration test:
 
@@ -36,7 +35,7 @@ Manual checks with representative recordings are still required:
   reload over another session and after restarting; check all four viewers.
 - Preview a pose correction, switch body part/settings and Save As; check source identity.
 
-Validation performed in the editing environment: MISS_HIT parsed all 46 MATLAB
+Validation performed in the editing environment: MISS_HIT parsed all 38 MATLAB
 files without parser errors; 23 low-priority pre-existing name/value style notices
 remain. `git diff --check` passed. One hundred randomized Python comparisons
 validated the STA normalization formula against direct event-window averaging.

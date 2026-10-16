@@ -453,10 +453,25 @@ function maskFig = mask_GUI(mousePos)
             return
         end
     
+        if ~isempty(time)
+            targetTime = data.gait.t(:);
+            if numel(time) < 2
+                error('DrawGUI:SpeedTime', 'Timestamped speed needs at least two samples.');
+            end
+            speed = interp1(time, speed, targetTime, 'linear', NaN);
+            time = targetTime;
+        else
+            time = data.gait.t(:);
+            if numel(speed) ~= numel(time)
+                error('DrawGUI:SpeedTraceSizeMismatch', 'Untimed speed must match the gait sample count.');
+            end
+        end
         if state.SmoothEnabled
             window = getSmoothWindowSamples();
     
-            speed = shared.fastsmooth(speed, window);
+            missing = ~isfinite(speed);
+            speed = movmean(speed, window, 'omitnan', 'Endpoints', 'shrink');
+            speed(missing) = NaN;
         end
     end
 
@@ -528,9 +543,7 @@ function maskFig = mask_GUI(mousePos)
             return
         end
 
-        [speed, ~] = getProcessedSpeed();
-        fs = getFrameRate();
-        x = (0:numel(speed)-1).' / fs;
+        [speed, x] = getProcessedSpeed();
         speedPlotAxes.XLabel.String = 'Time (s)';
 
         good = generateSpeedMask();
@@ -1153,13 +1166,10 @@ function maskFig = mask_GUI(mousePos)
     end
 
     function traceSize = getTraceSize()
-        if ~isfield(data.gait, 'paw') || isempty(data.gait.paw) || ...
-                ~isfield(data.gait.paw(1), 'trace') || ...
-                isempty(data.gait.paw(1).trace)
-            error('DrawGUI:MissingGaitTrace', ...
-                'data.gait.paw(1).trace is required to define mask size.');
+        if ~isfield(data.gait, 't') || isempty(data.gait.t)
+            error('DrawGUI:MissingGaitTrace', 'Import gait data before editing a mask.');
         end
-        traceSize = size(data.gait.paw(1).trace);
+        traceSize = size(data.gait.t);
     end
 
     %% Bottom command functions
@@ -1171,6 +1181,7 @@ function maskFig = mask_GUI(mousePos)
 
     function generateMaskAndClose(~, ~)
         data.gait.mask = buildCombinedMask();
+        if isfield(data.gait, 'maskTemp'), data.gait = rmfield(data.gait, 'maskTemp'); end
         syncPublicState();
         notify(data, 'DataChanged');
         close(maskFig);
@@ -1187,7 +1198,7 @@ function maskFig = mask_GUI(mousePos)
         traceSize = getTraceSize();
         nSamples = prod(traceSize);
         fs = getFrameRate();
-        time = (0:nSamples-1).' / fs;
+        time = data.gait.t(:);
 
         % No speed means no automatic exclusion: start with an all-good mask.
         if isempty(state.Speed)
@@ -1197,7 +1208,7 @@ function maskFig = mask_GUI(mousePos)
             if numel(mask) ~= nSamples
                 error('DrawGUI:SpeedTraceSizeMismatch', ...
                     ['Imported speed has %d samples, but ' ...
-                     'data.gait.paw(1).trace has %d samples.'], ...
+                     'gait time vector has %d samples.'], ...
                     numel(mask), nSamples);
             end
             mask = logical(mask(:));

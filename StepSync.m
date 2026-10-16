@@ -77,6 +77,23 @@ function hfig = StepSync(default_path)
         filename = fullfile(path, filename);
         savedata = load(filename);
         
+        required = {'defaultPath','frameRate','currentTime','currentZoom','figures'};
+        if ~all(isfield(savedata, required))
+            uialert(fig, 'This is not a StepSync session file.', 'Load error'); return;
+        end
+        validateattributes(savedata.frameRate, {'numeric'}, {'scalar','finite','nonnegative'});
+        validateattributes(savedata.currentTime, {'numeric'}, {'scalar','finite','nonnegative'});
+        validateattributes(savedata.currentZoom, {'numeric'}, {'vector','numel',2,'finite'});
+        if savedata.currentZoom(2) <= savedata.currentZoom(1)
+            error('StepSync:zoom', 'Saved zoom limits must be increasing.');
+        end
+        for name = {'gait','video','dlc','emg'}
+            if isfield(data.fig, name{1}) && isgraphics(data.fig.(name{1}), 'figure')
+                close(data.fig.(name{1}));
+            end
+            data.(name{1}) = struct();
+        end
+        data.fig = struct();
         hd.path.Value = savedata.defaultPath;
         data.frameRate = savedata.frameRate;
         data.currentTime = savedata.currentTime;
@@ -97,8 +114,13 @@ function hfig = StepSync(default_path)
 
         end
         % activate data display in each module
-        % notify(data, 'InfoChanged')
-        notify(data, 'DataChanged')
+        notify(data, 'InfoChanged');
+        notify(data, 'DataChanged');
+        % Assignments above do not emit events; synchronize restored views explicitly.
+        data.currentTime = savedata.currentTime;
+        data.currentZoom = savedata.currentZoom;
+        notify(data, 'TimeChanged');
+        notify(data, 'ZoomChanged');
     end
 
     % save data as a .mat file
@@ -182,7 +204,12 @@ function hfig = StepSync(default_path)
         for k = 1:length(fields)
             field = fields{k};
             if isfield(hd, field) && isgraphics(hd.(field))
-                set(hd.(field), param.(field));
+                values = param.(field);
+                order = {'Limits','Items','ItemsData','MajorTicks','MajorTickLabels','Value','Text','Enable'};
+                for j = 1:numel(order)
+                    prop = order{j};
+                    if isfield(values, prop), set(hd.(field), prop, values.(prop)); end
+                end
             end
         end
     end

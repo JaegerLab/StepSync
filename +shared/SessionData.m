@@ -51,19 +51,25 @@ classdef SessionData < handle
             end
         end
 
-        % decide frame rate from different data sources
+        function setFrameRate(obj, value)
+            validateattributes(value, {'numeric'}, {'scalar','real','finite','positive'});
+            obj.frameRate = double(value);
+            notify(obj, 'InfoChanged');
+            notify(obj, 'TimeChanged');
+        end
+
+        % Manual override > valid camera TTL rate > video rate > frame units.
         function frameRate = getFrameRate(obj)
-            if obj.frameRate~=0
-                % 1st priority, manually corrected frame rate
-                frameRate = obj.frameRate;
-            elseif obj.has('emg')
-                % digital triggers recorded from Intan
+            frameRate = obj.frameRate;
+            if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
+            if obj.has('emg') && isfield(obj.emg, 'trigger') && ...
+                    isfield(obj.emg.trigger, 'freq')
                 frameRate = obj.emg.trigger.freq;
-            elseif obj.has('video')
-                % video playback frame rate
+                if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
+            end
+            if obj.has('video')
                 frameRate = obj.video.vid.FrameRate;
             else
-                % without other data souce, use frame itself.
                 frameRate = 1;
             end
         end

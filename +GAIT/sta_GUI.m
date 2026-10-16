@@ -140,6 +140,10 @@ function fig = sta_GUI(mousePos)
             emgT = data.emg.processed.t;
         end
 
+        if ~GAIT.steps_current(data)
+            uialert(fig, 'Steps are not current. Recalculate the selected paw first.', 'Error');
+            return;
+        end
         % Paw / step selection
         pawIdx   = gHd.pawList.Value;
         stepName = gHd.stepList.Value;

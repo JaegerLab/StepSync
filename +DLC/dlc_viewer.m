@@ -35,6 +35,7 @@ function fig = dlc_viewer(default_path)
                 'ValueChangedFcn', @checkPChanged);
             uibutton(subgrid1,'Text','GetFrameRate', 'ButtonPushedFcn',@getFrameRate);
             hd.frameRate = uieditfield(subgrid1,'numeric','Value',1, ...
+                'Limits', [0 Inf], 'LowerLimitInclusive', 'off', ...
                 'ValueDisplayFormat','%.2f Hz','ValueChangedFcn', @frameRateChanged);
             hd.currentFrame = uieditfield(subgrid1,'numeric','Value',1, ...
                 'ValueDisplayFormat','Frame: %d');
@@ -96,9 +97,8 @@ function fig = dlc_viewer(default_path)
         end
         [filename, pathname]=uigetfile(filename, 'Open DeepLabCut file');
         drawnow; figure(fig);
-        filename=fullfile(pathname, filename);
-        
         if isequal(pathname,0), return; end
+        filename=fullfile(pathname, filename);
         if ~exist(filename, "file"), return; end
 
         hd.path.Value = filename;
@@ -106,6 +106,8 @@ function fig = dlc_viewer(default_path)
         % This reading function handles different kinds of data formats
         tabledlc = DLC.read_dlc(filename);
         data.dlc.table = tabledlc;
+        data.dlc.seg = [];
+        data.dlc.seg_bodypart = '';
 
         % update body part list
         hd.list_bodyparts.Enable = 'on';
@@ -381,8 +383,7 @@ function fig = dlc_viewer(default_path)
 
     % manually change frame rate edit field.
     function frameRateChanged(src,~)
-        data.frameRate = src.Value;
-        updateFrameRate(data.frameRate);
+        data.setFrameRate(src.Value);
     end
 
     function updateFrameRate(frameRate)
@@ -397,7 +398,7 @@ function fig = dlc_viewer(default_path)
         % update xlims if it's out of bound
         xlims = xlim(hd.ax);
         xlims = [max(xlims(1), data.dlc.t(1)) min(xlims(2), data.dlc.t(end))];
-        xlim(hd.ax, xlims);
+        if xlims(2) > xlims(1), xlim(hd.ax, xlims); end
         
         if hd.frameRate.Value == 1
             xlabel(hd.ax, 'Frame')
@@ -408,6 +409,7 @@ function fig = dlc_viewer(default_path)
 
     % triggered by info event
     function updateInfo()
+        if ~data.has('dlc'), return; end
         hd = data.dlc.hd;
 
         % collect info
@@ -416,9 +418,7 @@ function fig = dlc_viewer(default_path)
         data.dlc.t = (1:totalFrame)'./frameRate;
 
         currentFrame = round(data.currentTime * frameRate);
-        if currentFrame == 0
-            currentFrame = 1;
-        end
+        currentFrame = min(totalFrame, max(1, currentFrame));
         hd.currentFrame.Value = currentFrame;
 
         updateFrameRate(frameRate);
@@ -503,7 +503,7 @@ function fig = dlc_viewer(default_path)
     function updateDLCtime(currentTime)
         if data.has('dlc')
             hd = data.dlc.hd;
-            currentFrame = round(currentTime * data.getFrameRate());
+            currentFrame = min(height(data.dlc.table), max(1, round(currentTime * data.getFrameRate())));
             hd.currentFrame.Value = currentFrame;
 
             % update info text
@@ -559,6 +559,7 @@ function fig = dlc_viewer(default_path)
         if data.has('dlc')
             newZoom(1) = max([0 newZoom(1)]);
             newZoom(2) = min([newZoom(2) data.dlc.t(end)]);
+            if newZoom(2) <= newZoom(1), return; end
             xlim(data.dlc.hd.ax, newZoom);
             data.currentZoom = newZoom;
         end
@@ -582,7 +583,7 @@ function fig = dlc_viewer(default_path)
     function onClose(src,~)
         hd=data.dlc.hd;
         % close fix GUI first.
-        if isfield(hd, 'fixGUI')
+        if isfield(hd, 'fixGUI') && isgraphics(hd.fixGUI)
             close(hd.fixGUI)
         end
         % Clear DLC markers on video

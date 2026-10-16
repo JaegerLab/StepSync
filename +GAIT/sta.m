@@ -27,12 +27,12 @@ function result = sta(emg, emg_t, event_time, varargin)
     p.addRequired('emg');
     p.addRequired('emg_t');
     p.addRequired('event_time');
-    p.addParameter('max_lag',   0.5,      @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('max_lag',   0.5,      @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0);
     p.addParameter('method',    'dither', @(x) ischar(x) || isstring(x));
-    p.addParameter('nRep',      100,      @(x) isnumeric(x) && isscalar(x) && x > 0);
-    p.addParameter('offset',    1,        @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('nRep',      100,      @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0);
+    p.addParameter('offset',    1,        @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0);
     p.addParameter('zscore',    false,    @(x) islogical(x) || (isnumeric(x) && isscalar(x)));
-    p.addParameter('nStd',      3,        @(x) isnumeric(x) && isscalar(x) && x > 0);
+    p.addParameter('nStd',      3,        @(x) isnumeric(x) && isscalar(x) && isfinite(x) && x > 0);
     p.addParameter('plot',      false);
     p.parse(emg, emg_t, event_time, varargin{:});
 
@@ -54,39 +54,40 @@ function result = sta(emg, emg_t, event_time, varargin)
     end
 
     %% ── Pre-process signals ──────────────────────────────────────────────
+    validateattributes(emg, {'numeric'}, {'vector','real','nonempty'});
+    if ~any(isfinite(emg)), error('GAIT:sta:signal', 'EMG has no finite samples.'); end
     emg       = emg(:);
+    emg(~isfinite(emg)) = NaN;
     emg_t     = emg_t(:);
     event_time = event_time(:);
 
-    sample_rate = round(1 / mean(diff(emg_t)));
-    max_lag = min(max_lag, max(emg_t));  % clamp to trace length
-
-    % Discard negative-time samples
-    emg(emg_t <= 0) = [];
-    emg_t(emg_t <= 0) = [];
-    traceLength = length(emg);
-
-    % Clean event times
-    event_time(isnan(event_time)) = [];
-    event_index = round(event_time .* sample_rate);
-
-    out_of_bound = event_index > traceLength | event_index <= 0;
-    if any(out_of_bound)
-        event_index(out_of_bound) = [];
+    validateattributes(emg_t, {'numeric'}, {'vector','real','finite','increasing'});
+    if numel(emg_t) ~= numel(emg) || numel(emg_t) < 2
+        error('GAIT:sta:timebase', 'EMG and time must have the same length (at least 2).');
+    end
+    dt = median(diff(emg_t));
+    if any(abs(diff(emg_t)-dt) > max(1e-9, dt*1e-3))
+        error('GAIT:sta:timebase', 'STA requires regularly sampled EMG without timestamp gaps.');
+    end
+    sample_rate = 1/dt;
+    traceLength = numel(emg);
+    max_lag = min(max_lag, emg_t(end)-emg_t(1));
+    event_time = sort(event_time(isfinite(event_time)));
+    keep = event_time >= emg_t(1) & event_time <= emg_t(end);
+    if any(~keep)
         warning('GAIT:sta:outOfBound', 'Some event times were out of bounds and removed.');
     end
-
-    eventNum   = length(event_index);
-    lag_samps  = round(max_lag * sample_rate);
-
-    % Build event train
-    event_train = zeros(traceLength, 1);
-    event_train(event_index) = 1 / eventNum;
-
-    %% ── Compute STA ─────────────────────────────────────────────────────
+    event_time = event_time(keep);
+    event_index = round((event_time-emg_t(1))*sample_rate)+1;
+    eventNum = numel(event_index);
+    if eventNum == 0
+        error('GAIT:sta:noEvents', 'No event times fall within the EMG recording.');
+    end
+    nRep = max(1, nRep);
+    lag_samps = round(max_lag*sample_rate);
+    t = (-lag_samps:lag_samps)'/sample_rate;
     tic
-    [y_raw, m_lags] = xcorr(emg, event_train, lag_samps);
-    t = m_lags(:) ./ sample_rate;
+    y_raw = event_average(emg, event_index, lag_samps);
     elapsed_t = toc;
 
     %% ── Long-computation warning ─────────────────────────────────────────
@@ -127,8 +128,8 @@ function result = sta(emg, emg_t, event_time, varargin)
         switch actual_method
             %% ── global: whole-trace mean/std, no lag structure ───────────
             case 'global'
-                random_mean = mean(emg) ;
-                random_std  = std(emg) ;
+                random_mean = mean(emg, 'omitnan');
+                random_std = std(emg, 'omitnan');
 
             %% ── dither: jitter each real event by ±offset seconds ────────
             case 'dither'
@@ -137,40 +138,38 @@ function result = sta(emg, emg_t, event_time, varargin)
                     rand_shift = round(offset * 2 * sample_rate .* (rand(size(event_index)) - 0.5));
                     rand_idx   = event_index + rand_shift;
                     rand_idx(rand_idx > traceLength | rand_idx <= 0) = [];
-                    rand_train = zeros(traceLength, 1);
-                    rand_train(rand_idx) = 1 / numel(rand_idx);
-                    random_sta(:, k) = xcorr(emg, rand_train, lag_samps);
+                    random_sta(:, k) = event_average(emg, rand_idx, lag_samps);
                 end
-                random_mean = mean(random_sta, 2);
-                random_std  = std(random_sta, 0, 2);
+                random_mean = mean(random_sta, 2, 'omitnan');
+                random_std  = std(random_sta, 0, 2, 'omitnan');
 
             %% ── random_time: draw eventNum times uniformly ───────────────
             case 'random_time'
                 random_sta = zeros(2 * lag_samps + 1, nRep);
                 for k = 1:nRep
-                    rand_idx   = randperm(traceLength, eventNum);
-                    rand_train = zeros(traceLength, 1);
-                    rand_train(rand_idx) = 1 / eventNum;
-                    random_sta(:, k) = xcorr(emg, rand_train, lag_samps);
+                    if eventNum <= traceLength
+                        rand_idx = randperm(traceLength, eventNum);
+                    else
+                        rand_idx = randi(traceLength, eventNum, 1);
+                    end
+                    random_sta(:, k) = event_average(emg, rand_idx, lag_samps);
                 end
-                random_mean = mean(random_sta, 2);
-                random_std  = std(random_sta, 0, 2);
+                random_mean = mean(random_sta, 2, 'omitnan');
+                random_std  = std(random_sta, 0, 2, 'omitnan');
 
             %% ── isi_shuffle: permute inter-step intervals ────────────────
             case 'isi_shuffle'
-                isi = diff([0; event_time]);
+                isi = diff([emg_t(1); event_time]);
                 random_sta = zeros(2 * lag_samps + 1, nRep);
                 for k = 1:nRep
                     shuffled_isi  = isi(randperm(length(isi)));
-                    rand_times    = cumsum(shuffled_isi);
-                    rand_idx      = round(rand_times .* sample_rate);
+                    rand_times = emg_t(1) + cumsum(shuffled_isi);
+                    rand_idx = round((rand_times-emg_t(1))*sample_rate)+1;
                     rand_idx(rand_idx > traceLength | rand_idx <= 0) = [];
-                    rand_train = zeros(traceLength, 1);
-                    rand_train(rand_idx) = 1 / eventNum;
-                    random_sta(:, k) = xcorr(emg, rand_train, lag_samps);
+                    random_sta(:, k) = event_average(emg, rand_idx, lag_samps);
                 end
-                random_mean = mean(random_sta, 2);
-                random_std  = std(random_sta, 0, 2);
+                random_mean = mean(random_sta, 2, 'omitnan');
+                random_std  = std(random_sta, 0, 2, 'omitnan');
         end
     end
 
@@ -194,4 +193,18 @@ function result = sta(emg, emg_t, event_time, varargin)
     if ~isequal(plotArg, false) && ~isequal(plotArg, 0)
         GAIT.plot_sta(result, plotArg);
     end
+end
+
+function y = event_average(emg, indices, maxlag)
+% Accumulate duplicate events; each lag uses only observed finite samples.
+N = numel(emg);
+if isempty(indices), y = nan(2*maxlag+1,1); return; end
+train = accumarray(indices(:), 1, [N 1]);
+valid = isfinite(emg);
+emg(~valid) = 0;
+numerator = xcorr(emg, train, maxlag);
+counts = round(xcorr(double(valid), train, maxlag));
+y = nan(size(numerator));
+keep = counts > 0;
+y(keep) = numerator(keep)./counts(keep);
 end

@@ -1,4 +1,4 @@
-function tabledlc=DLC_read_mat(filename)
+function tabledlc=read_mat(filename)
 % read .mat files
 % Li Su, 2023/12/20
 

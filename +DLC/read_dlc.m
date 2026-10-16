@@ -37,7 +37,7 @@ function tabledlc = read_dlc(filename)
 
 % use the file extention to decide which data format it is
 [~,~,ext]=fileparts(filename);
-switch ext
+switch lower(ext)
     % ########## to do: handle different type of data formats ###
     case '.csv'
         if contains(filename, '.analysis')
@@ -51,6 +51,8 @@ switch ext
         tabledlc = DLC.read_h5(filename);
     case '.mat'
         tabledlc = DLC.read_mat(filename); 
+    otherwise
+        error('DLC:read_dlc:format', 'Unsupported pose extension: %s', ext);
     % === todo: add your own case and reader function here =====
     % case '.ext'
     %     tabledlc = DLC_read_ext(filename);

@@ -46,7 +46,7 @@ function drawGUI(default_path)
             'Text', 'Info:', 'BackgroundColor','W');
 
         hd.frameRate = uieditfield(subgrid1, 'numeric', ...
-            'Limits', [0 Inf], ...
+            'Limits', [0 Inf], 'LowerLimitInclusive', 'off', 'Value', 1, ...
             'ValueDisplayFormat', 'FrameRate: %.2f Hz', ...
             'ValueChangedFcn', @(src,~)updateFrameRate(src.Value));
 
@@ -82,7 +82,7 @@ function drawGUI(default_path)
 
     % Timer for playback
     hd.timer = timer('ExecutionMode', 'fixedRate', ...
-        'Period', 0.001, ...
+        'Period', 0.02, 'BusyMode', 'drop', ...
         'TimerFcn', @timerRunning);
 
     hd.path = hPath;
@@ -93,7 +93,7 @@ function drawGUI(default_path)
     % add listeners
     hd.timeListener = addlistener(data, 'TimeChanged', @(src, ~)updateVideoTime(src.currentTime));
     hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)updateInfo());
-    hd.dataListener = addlistener(data, 'DataChanged', @(src, ~)updateVideoFrame(src.video.frameIdx));
+    hd.dataListener = addlistener(data, 'DataChanged', @(~, ~)redrawVideo());
 
     data.video(1).hd = hd;
 end
@@ -120,41 +120,33 @@ function openVideo(~,~)
         filename = fullfile(path, file);
         hd.path.Value = filename;
     end
+    stop(hd.timer);
     data.video.vid = VideoReader(filename);
+    data.video.frameIdx = 1;
+    data.video.numFrames = data.video.vid.NumFrames;
     data.video.hd = hd;
 
     data.video.frameRate = data.getFrameRate();
     hd.frameRate.Value = data.video.frameRate;
 
-    % initialize video image
-    updateVideoFrame()
-
-    data.video.frameIdx = 1;
-    updateInfo
+    updateInfo();
+    updateVideoFrame(1);
+    data.setTime(1/data.getFrameRate());
+    notify(data, 'InfoChanged');
 end
 
 %% main == event response callback function
 function updateVideoFrame(newFrameIdx)
-    % no argument = display next frame
+    if ~data.has('video'), return; end
     hd = data.video.hd;
     frameRate = data.getFrameRate();
-    if ~data.has('video') || ... % no video
-       (nargin ==0 && ~data.video.vid.hasFrame()) || ... % no next frame
-       (nargin ==1 && (newFrameIdx < 1 || newFrameIdx > data.video.numFrames)) % out of bound
-        stop(hd.timer);
-        hd.play.Text = 'Play';
-        return; 
+    if nargin == 0, newFrameIdx = data.video.frameIdx + 1; end
+    if newFrameIdx < 1 || newFrameIdx > data.video.numFrames
+        stop(hd.timer); hd.play.Text = 'Play'; return;
     end
-    
-    % read video frame
-    if nargin == 0
-        % no argument, display next frame
-        CData = readFrame(data.video.vid); % faster way to read next frame
-        newFrameIdx = round(data.video.vid.CurrentTime * frameRate);
-    else
-        CData = read(data.video.vid, newFrameIdx);
-    end
-    
+    % Index is acquisition-frame identity, independent of encoded video time.
+    CData = read(data.video.vid, newFrameIdx);
+
     hd = shared.myPlot(@image, hd, 'image', hd.ax, CData);
     uistack(hd.image, "bottom")
     frameIdx = newFrameIdx;
@@ -175,10 +167,12 @@ function updateVideoTime(newTime)
     if ~data.has('video'); return; end  % no video
     
     frameRate = data.getFrameRate();
-    newFrameIdx = round(newTime * frameRate);
-    if newFrameIdx == data.video.frameIdx + 1
-        updateVideoFrame()
-    elseif newFrameIdx ~= data.video.frameIdx
+    requested = round(newTime * frameRate);
+    if requested > data.video.numFrames && strcmp(data.video.hd.timer.Running, 'on')
+        stop(data.video.hd.timer); data.video.hd.play.Text = 'Play';
+    end
+    newFrameIdx = min(data.video.numFrames, max(1, requested));
+    if newFrameIdx ~= data.video.frameIdx
         updateVideoFrame(newFrameIdx);
     end
 end
@@ -189,8 +183,7 @@ function updateInfo()
     frameIdx = data.video.frameIdx;
     % initialize Time, Frame, and slider
     hd.frame.Value = frameIdx;
-    hd.time.Value = data.video.vid.CurrentTime;
-    data.currentTime = data.video.vid.CurrentTime;
+    hd.time.Value = frameIdx / data.getFrameRate();
     hd.slider.Value = frameIdx;
 
     frameRate = data.getFrameRate();
@@ -200,12 +193,12 @@ function updateInfo()
     totalFrames = data.video.vid.NumFrames;
     data.video.numFrames = totalFrames;
 
-    hd.slider.Limits = [1 totalFrames];
+    hd.slider.Limits = [1 max(2,totalFrames)];
     % major ticks are minute marks, while values are still frame#
     hd.slider.MajorTicks = 1:frameRate*60:totalFrames;
     hd.slider.MajorTickLabels = (0:totalFrames/frameRate/60)+"'";
     
-    hd.frame.Limits = [1 totalFrames];
+    hd.frame.Limits = [1 max(2,totalFrames)];
     
     hd.info.Text = sprintf('Size: %dx%dpx\nFrames: %d', ...
         data.video.vid.Height, data.video.vid.Width, totalFrames);
@@ -215,17 +208,17 @@ end
 
 function updateFrameRate(value)
     if data.has('video')
-        data.frameRate = value;
-        notify(data, 'InfoChanged');
+        data.setFrameRate(value);
     end
 end
 
 % callback function for frame-by-frame buttons
 function moveVideoFrame(direction)
+    if ~data.has('video'), return; end
     playStep = bitshift(1, length(data.video.hd.next.Text)-1);
     if isempty(fig.CurrentModifier)
         % click without cotrol, move frame forward or backward
-        newFrameIdx = data.video.frameIdx + direction * playStep;
+        newFrameIdx = min(data.video.numFrames, max(1, data.video.frameIdx + direction * playStep));
         data.setTime(newFrameIdx/data.getFrameRate());
     elseif ismember('control', fig.CurrentModifier)
         % control + click: adjust step size or play speed
@@ -252,9 +245,12 @@ function manualFrameInput(~,~)
 end
 
 function togglePlay(~,~)
+    if ~data.has('video'), return; end
     hd = data.video.hd;
     if strcmp(hd.play.Text, 'Play')
         hd.play.Text = 'Pause';
+        data.video.playClock = tic;
+        data.video.playStartFrame = data.video.frameIdx;
         start(hd.timer);
     else
         hd.play.Text = 'Play';
@@ -264,10 +260,18 @@ function togglePlay(~,~)
 end
 
 function timerRunning(~,~)
+    if ~data.has('video'), return; end
     playStep = bitshift(1, length(data.video.hd.next.Text)-1);
-    newFrameIdx = data.video.frameIdx + playStep;
+    newFrameIdx = data.video.playStartFrame + floor(toc(data.video.playClock)*data.getFrameRate()*playStep);
+    newFrameIdx = min(data.video.numFrames, newFrameIdx);
     data.setTime(newFrameIdx/data.getFrameRate());
-    drawnow
+    if newFrameIdx >= data.video.numFrames
+        stop(data.video.hd.timer); data.video.hd.play.Text = 'Play';
+    end
+end
+
+function redrawVideo()
+    if data.has('video'), updateVideoFrame(data.video.frameIdx); end
 end
 
 % if there's DLC, draw the marker on the video
@@ -276,20 +280,34 @@ function drawDLCMarker()
         hd = data.video.hd;
         frameIdx = data.video.frameIdx;
         tabledlc = data.dlc.table;
+        if frameIdx > height(tabledlc)
+            for field = {'dlcMarker','dlcTempMarker'}
+                if isfield(hd, field{1}) && isgraphics(hd.(field{1}))
+                    hd.(field{1}).Visible = 'off';
+                end
+            end
+            return;
+        end
         bodypart = data.dlc.hd.list_bodyparts.Value;
 
         % show temp marker
-        if ismember('temp_x', tabledlc.Properties.VariableNames)
+        hasTemp = ismember('temp_x', tabledlc.Properties.VariableNames) && ...
+            isfield(data.dlc, 'seg_bodypart') && strcmp(data.dlc.seg_bodypart, bodypart);
+        if hasTemp
             hd = shared.myPlot( ...
                 @plot, hd, 'dlcTempMarker', hd.ax, ...
                 tabledlc.temp_x(frameIdx), tabledlc.temp_y(frameIdx), ...
                 'go', 'LineWidth', 2, 'HitTest','off');
+            hd.dlcTempMarker.Visible = 'on';
+        elseif isfield(hd, 'dlcTempMarker') && isgraphics(hd.dlcTempMarker)
+            hd.dlcTempMarker.Visible = 'off';
         end
 
         % show marker
         hd = shared.myPlot(@plot, hd, 'dlcMarker', hd.ax, ...
                 tabledlc.([bodypart '_x'])(frameIdx), tabledlc.([bodypart '_y'])(frameIdx), ...
                 'c+', 'LineWidth', 2, 'HitTest','off');
+        hd.dlcMarker.Visible = 'on';
         uistack(hd.dlcMarker, "top")
         data.video.hd = hd;
     end
@@ -343,6 +361,7 @@ function onMouseUp(~, ~)
             bodypart = data.dlc.hd.list_bodyparts.Value;
             data.dlc.table.([bodypart '_x'])(frameIdx) = drag.marker.XData;
             data.dlc.table.([bodypart '_y'])(frameIdx) = drag.marker.YData;
+            data.dlc.previewParameters = []; % source changed; regenerate before Save As
         elseif isequal(drag.marker, hd.dlcTempMarker)
             data.dlc.table.temp_x(frameIdx) = drag.marker.XData;
             data.dlc.table.temp_y(frameIdx) = drag.marker.YData;

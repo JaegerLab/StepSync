@@ -81,8 +81,8 @@ function drawGUI(default_path)
     ax.XTick = []; ax.YTick = [];
 
     % Timer for playback
-    hd.timer = timer('ExecutionMode', 'fixedRate', ...
-        'Period', 0.02, 'BusyMode', 'drop', ...
+    hd.timer = timer('ExecutionMode', 'fixedSpacing', ...
+        'Period', 0.02, ...
         'TimerFcn', @timerRunning);
 
     hd.path = hPath;
@@ -229,7 +229,7 @@ function moveVideoFrame(direction)
         newFrameIdx = min(last, max(1, data.video.frameIdx + direction * playStep));
         data.setTime(data.video.t(newFrameIdx));
     elseif ismember('control', fig.CurrentModifier)
-        % control + click: adjust step size or play speed
+        % control + click: adjust frame step size
         newStep = bitshift(playStep, direction); % *2 or /2
         if newStep >= 1 && newStep <= 16
             playStep = newStep; 
@@ -258,8 +258,6 @@ function togglePlay(~,~)
     hd = data.video.hd;
     if strcmp(hd.play.Text, 'Play')
         hd.play.Text = 'Pause';
-        data.video.playClock = tic;
-        data.video.playStartFrame = data.video.frameIdx;
         start(hd.timer);
     else
         hd.play.Text = 'Play';
@@ -271,12 +269,14 @@ end
 function timerRunning(~,~)
     if ~data.has('video'), return; end
     playStep = bitshift(1, length(data.video.hd.next.Text)-1);
-    newTime = data.video.t(data.video.playStartFrame) + toc(data.video.playClock)*playStep;
     last = find(isfinite(data.video.t),1,'last');
-    data.setTime(min(data.video.t(last),newTime));
-    if newTime >= data.video.t(last)
+    % Advance from the displayed frame; rendering time never skips a step.
+    newFrameIdx = min(last, data.video.frameIdx + playStep);
+    data.setTime(data.video.t(newFrameIdx));
+    if newFrameIdx >= last
         stop(data.video.hd.timer); data.video.hd.play.Text = 'Play';
     end
+    drawnow
 end
 
 function redrawVideo()

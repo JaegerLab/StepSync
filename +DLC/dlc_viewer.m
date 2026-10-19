@@ -250,7 +250,7 @@ function fig = dlc_viewer(default_path)
         % markers sit on the trace: let clicks fall through to it
         passThru  = {'PickableParts', 'none', 'LineStyle', 'none'};
         mk   = [{'MarkerSize', S.markSize, 'LineWidth', S.markWidth}, passThru];
-        attn = [{'Marker', 'o', 'MarkerSize', S.attnSize, 'LineWidth', S.attnWidth}, passThru];
+        attn = [{'Marker', S.attnMarker, 'MarkerSize', S.attnSize, 'LineWidth', S.attnWidth}, passThru];
 
         % interpolation where it replaces data, joined to the good frames
         show = ~good;
@@ -663,6 +663,7 @@ S.userBadMarker  = '*';         % user-made bad (user)
 S.unflagMarker   = 'o';         % never reached (grey)
 
 % needs attention: large circles at both ends
+S.attnMarker   = '^';
 S.attnSize     = 14;
 S.attnWidth    = 1.5;
 S.attnConflict = C.orange;      % neighbouring good segments

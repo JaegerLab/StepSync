@@ -1,4 +1,4 @@
-function fig = DLC_fix_GUI(mousePos)
+function fig = dlc_fix_GUI(mousePos)
 % GUI for auto fix DLC errors
 
     data = shared.SessionData.instance();

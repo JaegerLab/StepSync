@@ -1,12 +1,14 @@
 function steps = detect_steps(trace, mask, threshold, minInterval)
 %DETECT_STEPS Calculate one paw/trace; indices always refer to original frames.
+% steps = detect_steps(trace, mask, threshold, minInterval)
+
 trace = trace(:);
 mask = logical(mask(:));
 if numel(mask) ~= numel(trace), error('GAIT:maskSize', 'Mask and trace sizes differ.'); end
 validateattributes(minInterval, {'numeric'}, {'scalar','integer','positive','finite'});
 trace(~mask) = NaN;
 steps = struct('rising', [], 'falling', [], 'onset', [], 'offset', [], ...
-    'peak', [], 'valley', [], 'maxSpeed', [], 'noMove', find(diff(~mask)==1)+1);
+    'peak', [], 'valley', [], 'masked', find(diff(~mask)==1)+1);
 if ~isfinite(threshold) || ~any(isfinite(trace)), return; end
 steps.rising = find(trace(1:end-1)<=threshold & trace(2:end)>threshold);
 steps.falling = find(trace(1:end-1)>threshold & trace(2:end)<=threshold)+1;
@@ -39,11 +41,11 @@ prominence = std(trace, 'omitnan');
 for k = 1:numel(starts)
     range = starts(k):stops(k);
     if numel(range) < 3, continue; end
-    distance = min(minInterval, numel(range)-1);
+    distance = min(minInterval, numel(range)-2);
     [value, idx] = findpeaks(trace(range), 'MinPeakProminence', prominence, 'MinPeakDistance', distance);
     keep = value >= threshold;
     steps.peak = [steps.peak; starts(k)-1+idx(keep)]; %#ok<AGROW>
-    steps.maxSpeed = [steps.maxSpeed; value(keep)]; %#ok<AGROW>
+    
     [~, idx] = findpeaks(-trace(range), 'MinPeakProminence', prominence, 'MinPeakDistance', distance);
     idx = idx(trace(range(idx)) <= threshold);
     steps.valley = [steps.valley; starts(k)-1+idx]; %#ok<AGROW>

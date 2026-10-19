@@ -430,7 +430,7 @@ function fig = dlc_viewer(default_path)
         hd = data.dlc.hd;
         if ~isfield(hd, 'fixGUI') || ~isgraphics(hd.fixGUI, 'figure')
             % open a new window
-            hd.fixGUI = DLC.DLC_fix_GUI(mousePos);
+            hd.fixGUI = DLC.dlc_fix_GUI(mousePos);
         else
             % if window is already open, activate it.
             figure(hd.fixGUI)

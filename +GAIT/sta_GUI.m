@@ -41,7 +41,7 @@ function fig = sta_GUI(mousePos)
         'Tooltip', 'Half-window width for STA (seconds)');
 
     hd.ddMethod = uidropdown(subR1, ...
-        'Items',     {'No control', 'Global signal', 'Random time', 'ISI shuffle', 'Dither Offset'}, ...
+        'Items',     {'No control', 'Global (SEM)', 'Random time', 'ISI shuffle', 'Dither Offset'}, ...
         'ItemsData', {'none', 'global', 'random_time', 'isi_shuffle', 'dither'}, ...
         'Value',     'dither', ...
         'Tooltip', 'Method of random control', ...
@@ -198,6 +198,11 @@ function fig = sta_GUI(mousePos)
             data.gait.sta    = result;
             newIdx = 1;
         else
+            % Older saved runs predate per-lag event counts.
+            if ~isfield(data.gait.sta, 'sampleCount')
+                [data.gait.sta.sampleCount] = deal([]);
+            end
+            result = orderfields(result, data.gait.sta);
             data.gait.sta(end + 1) = result;
             newIdx = numel(data.gait.sta);
         end

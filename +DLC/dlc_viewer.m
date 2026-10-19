@@ -156,20 +156,22 @@ function fig = dlc_viewer(default_path)
         hd.info.Text = sprintf( ...
             ['total frames: %d, total time: %.2f\n' ...
             'x=%g, y=%g, p=%.3g'], ...
-            length(xdata), data.dlc.t(end), ...
+            length(xdata), max(data.dlc.t, [], 'omitnan'), ...
             xdata(f), ydata(f), pdata(f));
 
         % plot xy plots
         hold(hd.ax, "on");
         hd = shared.myPlot(@plot, hd, 'xplot', hd.ax, t, xdata, ...
                 '-', 'Color', S.xColor, 'LineWidth', S.trace, ...
-                'HitTest', 'off', 'DisplayName', S.legend.x, ...
+                'HitTest', 'on', 'ButtonDownFcn', @axClicked, 'DisplayName', S.legend.x, ...
                 'Visible', hd.chk_x.Value);
 
         hd = shared.myPlot(@plot, hd, 'yplot', hd.ax, t, ydata, ...
                 '-', 'Color', S.yColor, 'LineWidth', S.trace, ...
-                'HitTest', 'off', 'DisplayName', S.legend.y, ...
+                'HitTest', 'on', 'ButtonDownFcn', @axClicked, 'DisplayName', S.legend.y, ...
                 'Visible', hd.chk_y.Value);
+
+        set([hd.xplot hd.yplot], 'HitTest', 'on', 'ButtonDownFcn', @axClicked);
 
         % likelihood on the right y axis
         yyaxis(hd.ax, 'right');
@@ -389,7 +391,7 @@ function fig = dlc_viewer(default_path)
     function updateFrameRate(frameRate)
         hd = data.dlc.hd;
         totalFrame = height(data.dlc.table);
-        data.dlc.t = (1:totalFrame) / frameRate;
+        data.dlc.t = data.getFrameTimes(totalFrame);
 
         hd.frameRate.Value = frameRate;
 
@@ -397,7 +399,7 @@ function fig = dlc_viewer(default_path)
 
         % update xlims if it's out of bound
         xlims = xlim(hd.ax);
-        xlims = [max(xlims(1), data.dlc.t(1)) min(xlims(2), data.dlc.t(end))];
+        xlims = [max(xlims(1), data.dlc.t(1)) min(xlims(2), max(data.dlc.t, [], 'omitnan'))];
         if xlims(2) > xlims(1), xlim(hd.ax, xlims); end
         
         if hd.frameRate.Value == 1
@@ -415,9 +417,9 @@ function fig = dlc_viewer(default_path)
         % collect info
         frameRate = data.getFrameRate();
         totalFrame = height(data.dlc.table);
-        data.dlc.t = (1:totalFrame)'./frameRate;
+        data.dlc.t = data.getFrameTimes(totalFrame);
 
-        currentFrame = round(data.currentTime * frameRate);
+        currentFrame = shared.time_to_frame(data.dlc.t, data.currentTime);
         currentFrame = min(totalFrame, max(1, currentFrame));
         hd.currentFrame.Value = currentFrame;
 
@@ -486,7 +488,7 @@ function fig = dlc_viewer(default_path)
 
         data.dlc.table.temp_x = tempX;
         data.dlc.table.temp_y = tempY;
-        data.dlc.table.temp_likelihood = mask;
+        data.dlc.table.temp_likelihood = DLC.seg_likelihood(seg);
         data.dlc.seg = seg;
         notify(data, 'DataChanged');
     end
@@ -503,7 +505,7 @@ function fig = dlc_viewer(default_path)
     function updateDLCtime(currentTime)
         if data.has('dlc')
             hd = data.dlc.hd;
-            currentFrame = min(height(data.dlc.table), max(1, round(currentTime * data.getFrameRate())));
+            currentFrame = shared.time_to_frame(data.dlc.t, currentTime);
             hd.currentFrame.Value = currentFrame;
 
             % update info text
@@ -520,7 +522,7 @@ function fig = dlc_viewer(default_path)
             hd.info.Text = sprintf( ...
                 ['total frames: %d, total time: %.2f\n' ...
                 'x=%g, y=%g, p=%.3g'], ...
-                length(xdata), data.dlc.t(end), ...
+                length(xdata), max(data.dlc.t, [], 'omitnan'), ...
                 xdata(f), ydata(f), pdata(f));
 
 
@@ -558,7 +560,7 @@ function fig = dlc_viewer(default_path)
     function updateDLCzoom(newZoom)
         if data.has('dlc')
             newZoom(1) = max([0 newZoom(1)]);
-            newZoom(2) = min([newZoom(2) data.dlc.t(end)]);
+            newZoom(2) = min([newZoom(2) max(data.dlc.t, [], 'omitnan')]);
             if newZoom(2) <= newZoom(1), return; end
             xlim(data.dlc.hd.ax, newZoom);
             data.currentZoom = newZoom;
@@ -566,7 +568,9 @@ function fig = dlc_viewer(default_path)
     end
 
     function refresh(~,~)
-        data.setZoom(data.dlc.t([1 end]));
+        if ~data.has('dlc'), return; end
+        finiteTime = data.dlc.t(isfinite(data.dlc.t));
+        if numel(finiteTime)>1, data.setZoom(finiteTime([1 end])); end
 
         updateInfo();
     end

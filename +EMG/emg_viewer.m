@@ -84,7 +84,13 @@ function fig = emg_viewer(default_path)
         drawnow; figure(fig);
         if isequal(pathname, 0), return; end
 
-        emgData = EMG.emg_read(pathname);
+        try
+            emgData = EMG.emg_read(pathname);
+        catch ME
+            drawnow; figure(fig);
+            if strcmp(ME.identifier,'EMG:cancelled'), return; end
+            rethrow(ME);
+        end
         drawnow; figure(fig); % Return from reader dialogs (including Open Ephys TTL selection).
 
         if isfield(hd, 'prepGUI') && isgraphics(hd.prepGUI), close(hd.prepGUI); end
@@ -96,6 +102,8 @@ function fig = emg_viewer(default_path)
         data.emg.analog_data = emgData.analog_data;
         data.emg.analog_channels = emgData.analog_channels;
         data.emg.sample_rate = emgData.sample_rate;
+        data.emg.analog_units = 'uV';
+        if isfield(emgData,'analog_units'), data.emg.analog_units = emgData.analog_units; end
         if isfield(emgData, 'dig_in_data')
             % Intan
             digital = emgData.dig_in_data;
@@ -125,12 +133,20 @@ function fig = emg_viewer(default_path)
             data.emg.trigger = emgData.trigger;
         end
         data.emg.t = emgData.t;
+        if isfield(data.emg, 'trigger')
+            intervals = diff(data.emg.trigger.time);
+            intervals = intervals(isfinite(intervals) & intervals > 0);
+            data.emg.trigger.freq = NaN;
+            if ~isempty(intervals), data.emg.trigger.freq = 1/median(intervals); end
+            data.emg.trigger.number = numel(data.emg.trigger.time);
+        end
 
         hd.datatype.Items = "Raw";
         hd.sortby.Enable = 'off';
 
         notify(data, 'InfoChanged');
         notify(data, 'DataChanged');
+        notify(data, 'TimeChanged');
     end
 
     % separate reading and updating info, because reading is slow, and
@@ -141,8 +157,6 @@ function fig = emg_viewer(default_path)
         hd = data.emg.hd;
         
         if isfield(data.emg, 'trigger')
-            data.emg.trigger.freq = 1/median(diff(data.emg.trigger.time));
-            data.emg.trigger.number = length(data.emg.trigger.time);
             triggerInfo = sprintf('Trigger#: %d, Freq: %.2f Hz', ...
                 data.emg.trigger.number, data.emg.trigger.freq);
         else
@@ -151,8 +165,20 @@ function fig = emg_viewer(default_path)
 
         % Update UI -------------------
         hd.path.Value = data.emg.display_name;
-        hd.chanList.Items = data.emg.analog_channels;
-        hd.chanList.ItemsData = 1:length(data.emg.analog_channels);
+        if isfield(data.emg,'analog_units'), ylabel(hd.ax,['EMG (' data.emg.analog_units ')']); end
+        selectedChannel = hd.chanList.Value;
+        if isfield(data.emg, 'ch_mapping')
+            [~, order] = sort(data.emg.ch_mapping.(hd.sortby.Value));
+            hd.chanList.Items = data.emg.ch_mapping.Names(order);
+            hd.chanList.ItemsData = order;
+        else
+            hd.chanList.Items = data.emg.analog_channels;
+            hd.chanList.ItemsData = 1:length(data.emg.analog_channels);
+        end
+        if isnumeric(selectedChannel) && isscalar(selectedChannel) && ...
+                ismember(selectedChannel, hd.chanList.ItemsData)
+            hd.chanList.Value = selectedChannel;
+        end
 
         hd.info.Text = sprintf( ...
             'Rate: %d Hz, Length: %.2f s\n%s', ...
@@ -334,6 +360,7 @@ function fig = emg_viewer(default_path)
     end
 
     function refresh(~,~)
+        if ~data.has('emg'), return; end
         data.setZoom([0 data.emg.t(end)]);
 
         updateInfo();

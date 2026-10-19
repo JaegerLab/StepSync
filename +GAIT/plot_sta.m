@@ -39,7 +39,7 @@ function ax = plot_sta(result, target)
     nStd         = result.nStd;
     max_lag      = result.max_lag;
     doControl    = ~strcmp(result.method, 'none');
-    is_global    = strcmp(result.method, 'global');
+
     zscore    = result.zscore && doControl;
 
     if zscore
@@ -66,13 +66,13 @@ function ax = plot_sta(result, target)
         ci_upper = rand_mean_disp + nStd .* rand_std_disp;
         ci_lower = rand_mean_disp - nStd .* rand_std_disp;
 
-        if is_global || zscore || isscalar(ci_upper) || isscalar(ci_lower)
+        if zscore || isscalar(ci_upper) || isscalar(ci_lower)
             % Flat rectangle to reduce complexity of the graph
             fill_x = max_lag .* [-1 1 1 -1];
             fill_y = [ci_lower(1) ci_lower(1) ci_upper(1) ci_upper(1)];
             fill1  = fill(ax, fill_x, fill_y, ...
                 'k', 'EdgeColor', 'none', 'FaceAlpha', 0.15, ...
-                'DisplayName', sprintf('%d std CI (%.1f%%)', nStd, ci_pct(nStd)));
+                'DisplayName', band_label(result.method,nStd));
             line1  = yline(ax, rand_mean_disp(1), 'k--', ...
                 'DisplayName', 'control mean');
         else
@@ -81,7 +81,7 @@ function ax = plot_sta(result, target)
             fill_y = [ci_upper; flipud(ci_lower)];
             fill1  = fill(ax, fill_x, fill_y, ...
                 'k', 'EdgeColor', 'none', 'FaceAlpha', 0.15, ...
-                'DisplayName', sprintf('%d std CI (%.1f%%)', nStd, ci_pct(nStd)));
+                'DisplayName', band_label(result.method,nStd));
             line1  = plot(ax, t, rand_mean_disp, 'k--', ...
                 'DisplayName', 'control mean');
         end
@@ -132,4 +132,12 @@ function pct = ci_pct(n)
         case 3;  pct = 99.7;
         otherwise; pct = 100 * (erf(n/sqrt(2)));
     end
+end
+
+function label = band_label(method,nStd)
+if strcmp(method,'global')
+    label = sprintf('Approx. %g SEM band',nStd);
+else
+    label = sprintf('%g SD null band',nStd);
+end
 end

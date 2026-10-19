@@ -5,7 +5,7 @@ end
 
 function testOnsetAndOffsetStayInsideTrace(testCase)
 trace = [0;0;4;4;0];
-s = GAIT.detect_steps(trace, true(size(trace)), 3, 10);
+s = GAIT.detect_steps(trace, true(size(trace)), 3, 10, 2.5);
 verifyEqual(testCase, s.onset, 2);
 verifyEqual(testCase, s.offset, 5);
 end

@@ -37,7 +37,7 @@
 | 22 | Alternative correction routines were already deleted upstream; not reintroduced. |
 | 23 | Removed the stale head-fixed prototype after confirming it is outside the application call chain. Head-fixed analysis remains in the active GUI. |
 | 24 | Reconstruct SLEAP frame gaps; select one track rather than flattening tracks. |
-| 25 | Playback follows elapsed wall time and acquisition rate, dropping display frames when rendering cannot keep up. |
+| 25 | Superseded by the playback correction below: advance by the selected frame step, without wall-clock catch-up. |
 | 26 | Validate positive finite rate overrides; use valid TTL/video fallback. |
 | 27 | Handle full-length/oversized smoothing windows and localize missing samples instead of poisoning the entire tail. |
 | 28 | Removed the unused Kalman smoother and its test. |
@@ -101,3 +101,12 @@ Removed tests targeting the deleted head-fixed prototype and Kalman smoother.
 - Added regression coverage for timing, migration, statistics, resting thresholds,
   units, CSV, likelihoods and GUI guards. Static parsing passes; MATLAB execution
   remains required before merging or relying on changed scientific outputs.
+
+## Frame-step playback correction
+
+Restored the intended playback contract after owner testing: each timer callback
+advances from the displayed frame by the selected PlayStep (1/2/4/8/16).
+A fixed-spacing timer waits for the callback to complete, so slow rendering only
+slows playback. No tic/toc or frame-rate multiplier is used. The final step clamps
+to the last timestamped frame and stops. TTL timestamps still synchronize viewers.
+Static parsing passes; MATLAB video/GUI playback must be verified manually.

@@ -160,7 +160,7 @@ function fig = emg_viewer(default_path)
             triggerInfo = sprintf('Trigger#: %d, Freq: %.2f Hz', ...
                 data.emg.trigger.number, data.emg.trigger.freq);
         else
-            triggerInfo = "";
+            triggerInfo = "Camera trigger not found.";
         end
 
         % Update UI -------------------
@@ -257,6 +257,7 @@ function fig = emg_viewer(default_path)
         % select file
         [file, path] = uigetfile(default_file, 'Select Channel Mapping File', 'MultiSelect', 'off');
         if isequal(path,0), return; end
+        drawnow; figure(fig);
         filename = fullfile(path, file);
         if ~exist(filename, "file"), return; end
         

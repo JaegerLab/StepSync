@@ -123,7 +123,7 @@ function openVideo(~,~)
     stop(hd.timer);
     data.video.vid = VideoReader(filename);
     data.video.frameIdx = 1;
-    data.video.numFrames = data.video.vid.NumFrames;
+    
     data.video.hd = hd;
 
     data.video.frameRate = data.getFrameRate();
@@ -203,7 +203,7 @@ function updateInfo()
     % major ticks are minute marks, while values are still frame#
     tickTimes = data.video.t(1):60:data.video.t(lastMatched);
     hd.slider.MajorTicks = shared.time_to_frame(data.video.t,tickTimes);
-    hd.slider.MajorTickLabels = string(tickTimes/60)+"'";
+    hd.slider.MajorTickLabels = string(round(tickTimes/60))+"'";
     
     hd.frame.Limits = [1 max(2,lastMatched)];
     

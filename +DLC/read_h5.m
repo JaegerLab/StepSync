@@ -21,6 +21,8 @@ tabledlc.Properties.VariableNames = headers;
 
 % store scorer
 tabledlc.Properties.Description = filename;
+tabledlc = addprop(tabledlc,'Scorer','table');
+tabledlc.Properties.CustomProperties.Scorer = scorer;
 % store bodyparts
 tabledlc.Properties.UserData = bodyparts;
 

@@ -81,8 +81,8 @@ function drawGUI(default_path)
     ax.XTick = []; ax.YTick = [];
 
     % Timer for playback
-    hd.timer = timer('ExecutionMode', 'fixedRate', ...
-        'Period', 0.02, 'BusyMode', 'drop', ...
+    hd.timer = timer('ExecutionMode', 'fixedSpacing', ...
+        'Period', 0.02, ...
         'TimerFcn', @timerRunning);
 
     hd.path = hPath;
@@ -123,7 +123,7 @@ function openVideo(~,~)
     stop(hd.timer);
     data.video.vid = VideoReader(filename);
     data.video.frameIdx = 1;
-    data.video.numFrames = data.video.vid.NumFrames;
+    
     data.video.hd = hd;
 
     data.video.frameRate = data.getFrameRate();
@@ -131,7 +131,7 @@ function openVideo(~,~)
 
     updateInfo();
     updateVideoFrame(1);
-    data.setTime(1/data.getFrameRate());
+    data.setTime(data.video.t(1));
     notify(data, 'InfoChanged');
 end
 
@@ -141,6 +141,8 @@ function updateVideoFrame(newFrameIdx)
     hd = data.video.hd;
     frameRate = data.getFrameRate();
     if nargin == 0, newFrameIdx = data.video.frameIdx + 1; end
+    lastMatched = find(isfinite(data.video.t),1,'last');
+    newFrameIdx = min(lastMatched,max(1,round(newFrameIdx)));
     if newFrameIdx < 1 || newFrameIdx > data.video.numFrames
         stop(hd.timer); hd.play.Text = 'Play'; return;
     end
@@ -153,7 +155,7 @@ function updateVideoFrame(newFrameIdx)
 
     % update Time, Frame, and slider
     hd.frame.Value = frameIdx;
-    hd.time.Value = frameIdx / frameRate;
+    hd.time.Value = data.video.t(frameIdx);
     hd.slider.Value = frameIdx;
     data.video.frameIdx = frameIdx;
     data.video.hd = hd;
@@ -167,7 +169,7 @@ function updateVideoTime(newTime)
     if ~data.has('video'); return; end  % no video
     
     frameRate = data.getFrameRate();
-    requested = round(newTime * frameRate);
+    requested = shared.time_to_frame(data.video.t,newTime);
     if requested > data.video.numFrames && strcmp(data.video.hd.timer.Running, 'on')
         stop(data.video.hd.timer); data.video.hd.play.Text = 'Play';
     end
@@ -180,10 +182,12 @@ end
 function updateInfo()
     if ~data.has('video'); return; end
     hd = data.video.hd;
-    frameIdx = data.video.frameIdx;
+    data.video.numFrames = data.video.vid.NumFrames;
+    data.video.t = data.getFrameTimes(data.video.numFrames);
+    frameIdx = min(data.video.frameIdx, find(isfinite(data.video.t),1,'last'));
     % initialize Time, Frame, and slider
     hd.frame.Value = frameIdx;
-    hd.time.Value = frameIdx / data.getFrameRate();
+    hd.time.Value = data.video.t(frameIdx);
     hd.slider.Value = frameIdx;
 
     frameRate = data.getFrameRate();
@@ -192,13 +196,16 @@ function updateInfo()
     % It's slow if opening video for the first time.
     totalFrames = data.video.vid.NumFrames;
     data.video.numFrames = totalFrames;
+    data.video.t = data.getFrameTimes(totalFrames);
+    lastMatched = find(isfinite(data.video.t),1,'last');
 
-    hd.slider.Limits = [1 max(2,totalFrames)];
+    hd.slider.Limits = [1 max(2,lastMatched)];
     % major ticks are minute marks, while values are still frame#
-    hd.slider.MajorTicks = 1:frameRate*60:totalFrames;
-    hd.slider.MajorTickLabels = (0:totalFrames/frameRate/60)+"'";
+    tickTimes = data.video.t(1):60:data.video.t(lastMatched);
+    hd.slider.MajorTicks = shared.time_to_frame(data.video.t,tickTimes);
+    hd.slider.MajorTickLabels = string(round(tickTimes/60))+"'";
     
-    hd.frame.Limits = [1 max(2,totalFrames)];
+    hd.frame.Limits = [1 max(2,lastMatched)];
     
     hd.info.Text = sprintf('Size: %dx%dpx\nFrames: %d', ...
         data.video.vid.Height, data.video.vid.Width, totalFrames);
@@ -218,10 +225,11 @@ function moveVideoFrame(direction)
     playStep = bitshift(1, length(data.video.hd.next.Text)-1);
     if isempty(fig.CurrentModifier)
         % click without cotrol, move frame forward or backward
-        newFrameIdx = min(data.video.numFrames, max(1, data.video.frameIdx + direction * playStep));
-        data.setTime(newFrameIdx/data.getFrameRate());
+        last = find(isfinite(data.video.t),1,'last');
+        newFrameIdx = min(last, max(1, data.video.frameIdx + direction * playStep));
+        data.setTime(data.video.t(newFrameIdx));
     elseif ismember('control', fig.CurrentModifier)
-        % control + click: adjust step size or play speed
+        % control + click: adjust frame step size
         newStep = bitshift(playStep, direction); % *2 or /2
         if newStep >= 1 && newStep <= 16
             playStep = newStep; 
@@ -233,14 +241,15 @@ function moveVideoFrame(direction)
 end
 
 function sliderMoved(src,~)
-    data.setTime(src.Value/data.getFrameRate());
+    idx = min(find(isfinite(data.video.t),1,'last'),max(1,round(src.Value)));
+    data.setTime(data.video.t(idx));
 end
 
 function manualFrameInput(~,~)
     hd = data.video.hd;
-    frameIdx = round(hd.frame.Value);
+    frameIdx = min(find(isfinite(data.video.t),1,'last'),round(hd.frame.Value));
     frameRate = data.getFrameRate();
-    hd.time.Value = frameIdx / frameRate;
+    hd.time.Value = data.video.t(frameIdx);
     data.setTime(hd.time.Value) % notify other modules.
 end
 
@@ -249,8 +258,6 @@ function togglePlay(~,~)
     hd = data.video.hd;
     if strcmp(hd.play.Text, 'Play')
         hd.play.Text = 'Pause';
-        data.video.playClock = tic;
-        data.video.playStartFrame = data.video.frameIdx;
         start(hd.timer);
     else
         hd.play.Text = 'Play';
@@ -262,16 +269,18 @@ end
 function timerRunning(~,~)
     if ~data.has('video'), return; end
     playStep = bitshift(1, length(data.video.hd.next.Text)-1);
-    newFrameIdx = data.video.playStartFrame + floor(toc(data.video.playClock)*data.getFrameRate()*playStep);
-    newFrameIdx = min(data.video.numFrames, newFrameIdx);
-    data.setTime(newFrameIdx/data.getFrameRate());
-    if newFrameIdx >= data.video.numFrames
+    last = find(isfinite(data.video.t),1,'last');
+    % Advance from the displayed frame; rendering time never skips a step.
+    newFrameIdx = min(last, data.video.frameIdx + playStep);
+    data.setTime(data.video.t(newFrameIdx));
+    if newFrameIdx >= last
         stop(data.video.hd.timer); data.video.hd.play.Text = 'Play';
     end
+    drawnow
 end
 
 function redrawVideo()
-    if data.has('video'), updateVideoFrame(data.video.frameIdx); end
+    if data.has('video'), updateVideoFrame(shared.time_to_frame(data.video.t,data.currentTime)); end
 end
 
 % if there's DLC, draw the marker on the video

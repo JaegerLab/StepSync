@@ -87,7 +87,7 @@ function result = sta(emg, emg_t, event_time, varargin)
     lag_samps = round(max_lag*sample_rate);
     t = (-lag_samps:lag_samps)'/sample_rate;
     tic
-    y_raw = event_average(emg, event_index, lag_samps);
+    [y_raw, sampleCount] = event_average(emg, event_index, lag_samps);
     elapsed_t = toc;
 
     %% ── Long-computation warning ─────────────────────────────────────────
@@ -128,8 +128,9 @@ function result = sta(emg, emg_t, event_time, varargin)
         switch actual_method
             %% ── global: whole-trace mean/std, no lag structure ───────────
             case 'global'
-                random_mean = mean(emg, 'omitnan');
-                random_std = std(emg, 'omitnan');
+                random_mean = mean(emg, 'omitnan')*ones(size(t));
+                random_std = std(emg, 'omitnan')./sqrt(sampleCount);
+                random_std(sampleCount==0) = NaN;
 
             %% ── dither: jitter each real event by ±offset seconds ────────
             case 'dither'
@@ -188,6 +189,7 @@ function result = sta(emg, emg_t, event_time, varargin)
     result.random_std  = random_std;
     result.eventNum    = eventNum;
     result.sample_rate = sample_rate;
+    result.sampleCount = sampleCount;
 
     %% ── Optional plot ────────────────────────────────────────────────────
     if ~isequal(plotArg, false) && ~isequal(plotArg, 0)
@@ -195,10 +197,10 @@ function result = sta(emg, emg_t, event_time, varargin)
     end
 end
 
-function y = event_average(emg, indices, maxlag)
+function [y, counts] = event_average(emg, indices, maxlag)
 % Accumulate duplicate events; each lag uses only observed finite samples.
 N = numel(emg);
-if isempty(indices), y = nan(2*maxlag+1,1); return; end
+if isempty(indices), y = nan(2*maxlag+1,1); counts = zeros(size(y)); return; end
 train = accumarray(indices(:), 1, [N 1]);
 valid = isfinite(emg);
 emg(~valid) = 0;

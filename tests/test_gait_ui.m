@@ -47,11 +47,14 @@ verifyEqual(testCase,S.gait.paw(2).rising,first);
 hd.trace.Value = 'Y';
 callback = hd.trace.ValueChangedFcn; callback(hd.trace,[]);
 verifyEqual(testCase,S.gait.paw(2).traceType,'y');
+verifyFalse(testCase,any(ismember({'onset','offset'},hd.stepList.Items)));
+verifyEmpty(testCase,S.gait.paw(2).onset);
+verifyEmpty(testCase,S.gait.paw(2).offset);
 verifyNotEqual(testCase,S.gait.paw(2).rising,first);
 % Preview never changes committed-mask events, even when it excludes everything.
 beforePreview = S.gait.paw(2).rising;
 S.gait.maskTemp = false(size(S.gait.t));
-notify(S,'InfoChanged');
+notify(S,'MaskPreviewChanged');
 verifyEqual(testCase,S.gait.paw(2).rising,beforePreview);
 S.gait = rmfield(S.gait,'maskTemp');
 % Manual threshold survives refresh and preview.
@@ -78,4 +81,46 @@ end
 function cleanupViewer(fig,S,rate)
 if isgraphics(fig), close(fig); end
 S.frameRate = rate;
+end
+
+function testEmgInfoPreservesMappedChannelIdentity(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+oldRate = S.frameRate;
+fig = EMG.emg_viewer(pwd);
+cleanup = onCleanup(@()cleanupViewer(fig,S,oldRate)); %#ok<NASGU>
+hd = S.emg.hd;
+S.emg.analog_data = zeros(101,2);
+S.emg.analog_channels = {'raw1','raw2'};
+S.emg.t = (0:0.01:1)'; S.emg.sample_rate = 100; S.emg.display_name = pwd;
+S.emg.ch_mapping = table({'B';'A'},{'mapped1';'mapped2'},'VariableNames',{'Muscle','Names'});
+hd.sortby.Items = {'Muscle'}; hd.sortby.Value = 'Muscle';
+hd.chanList.Items = {'raw1','raw2'}; hd.chanList.ItemsData = [1 2]; hd.chanList.Value = 1;
+notify(S,'InfoChanged');
+verifyEqual(testCase,hd.chanList.Items(:),{'mapped2';'mapped1'});
+verifyEqual(testCase,hd.chanList.Value,1);
+S.frameRate = 120; notify(S,'InfoChanged');
+verifyEqual(testCase,hd.chanList.Items(:),{'mapped2';'mapped1'});
+verifyEqual(testCase,hd.chanList.ItemsData(:),[2;1]);
+verifyEqual(testCase,hd.chanList.Value,1);
+end
+
+function testRefreshWithoutDataIsSafe(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+figures = {EMG.emg_viewer(pwd), DLC.dlc_viewer(pwd), GAIT.gait_viewer(pwd)};
+cleanup = onCleanup(@()closeViewers(figures)); %#ok<NASGU>
+for k = 1:numel(figures)
+    button = findall(figures{k},'Tooltip','Refresh');
+    callback = button.ButtonPushedFcn; callback(button,[]);
+end
+verifyTrue(testCase,all(cellfun(@isgraphics,figures)));
+end
+
+function closeViewers(figures)
+for k = numel(figures):-1:1
+    if isgraphics(figures{k}), close(figures{k}); end
+end
 end

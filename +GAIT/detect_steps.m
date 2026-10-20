@@ -1,7 +1,8 @@
-function steps = detect_steps(trace, mask, threshold, minInterval)
+function steps = detect_steps(trace, mask, threshold, minInterval, nearZero)
 %DETECT_STEPS Calculate one paw/trace; indices always refer to original frames.
 % steps = detect_steps(trace, mask, threshold, minInterval)
 
+if nargin<5, nearZero = NaN; end
 trace = trace(:);
 mask = logical(mask(:));
 if numel(mask) ~= numel(trace), error('GAIT:maskSize', 'Mask and trace sizes differ.'); end
@@ -20,7 +21,7 @@ for k = 1:numel(onset)
     % Do not search across a masked/missing interval.
     gap = find(~isfinite(trace(range)), 1, 'last');
     if ~isempty(gap), range = range(gap+1:end); end
-    j = find(trace(range) <= 2.5, 1, 'last');
+    j = find(trace(range) <= nearZero, 1, 'last');
     if ~isempty(j), onset(k) = range(j); end
 end
 for k = 1:numel(offset)
@@ -28,7 +29,7 @@ for k = 1:numel(offset)
     range = f:min(numel(trace), f+minInterval);
     gap = find(~isfinite(trace(range)), 1, 'first');
     if ~isempty(gap), range = range(1:gap-1); end
-    j = find(trace(range) <= 2.5, 1, 'first');
+    j = find(trace(range) <= nearZero, 1, 'first');
     if ~isempty(j), offset(k) = range(j); end
 end
 steps.onset = unique(onset(isfinite(onset)));

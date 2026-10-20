@@ -16,6 +16,7 @@ classdef SessionData < handle
         ZoomChanged
         DataChanged
         InfoChanged
+        MaskPreviewChanged
     end
 
     methods (Access = private)
@@ -72,6 +73,15 @@ classdef SessionData < handle
             else
                 frameRate = 1;
             end
+        end
+
+        function t = getFrameTimes(obj, nFrames)
+            triggers = [];
+            if obj.has('emg') && isfield(obj.emg, 'trigger') && ...
+                    isfield(obj.emg.trigger, 'time') && numel(obj.emg.trigger.time) >= 2
+                triggers = obj.emg.trigger.time;
+            end
+            t = shared.frame_times(nFrames, obj.getFrameRate(), triggers);
         end
 
         % check if data section is available

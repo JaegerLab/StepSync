@@ -4,7 +4,7 @@
 
 - `maskTemp` is display-only. Detection and STA events use committed `mask`.
   Generate Mask clears the preview before broadcasting committed data.
-- Frame 1 remains at `1/frameRate`; this update does not shift existing gait/DLC sessions.
+- Without camera TTLs, frame 1 remains at `1/frameRate`. The subsequent timing review below adds measured camera timing when available.
 - Only the selected paw/trace is analyzed. No per-paw `.trace` vector is required.
 - Manual thresholds persist across refreshes. Automatic thresholds use the full
   finite trace, consistently in display and detection, as in the prior plot behavior.
@@ -37,7 +37,7 @@
 | 22 | Alternative correction routines were already deleted upstream; not reintroduced. |
 | 23 | Removed the stale head-fixed prototype after confirming it is outside the application call chain. Head-fixed analysis remains in the active GUI. |
 | 24 | Reconstruct SLEAP frame gaps; select one track rather than flattening tracks. |
-| 25 | Playback follows elapsed wall time and acquisition rate, dropping display frames when rendering cannot keep up. |
+| 25 | Superseded by the playback correction below: advance by the selected frame step, without wall-clock catch-up. |
 | 26 | Validate positive finite rate overrides; use valid TTL/video fallback. |
 | 27 | Handle full-length/oversized smoothing windows and localize missing samples instead of poisoning the entire tail. |
 | 28 | Removed the unused Kalman smoother and its test. |
@@ -72,3 +72,41 @@ At the owner's request, removed all eight files outside the application call cha
 - `+shared/nan_index.m`
 
 Removed tests targeting the deleted head-fixed prototype and Kalman smoother.
+
+## Timing and independent-review follow-up
+
+- Camera TTL timestamps now supply a shared frame clock to video, pose, gait,
+  masks and STA. A count difference of one is treated as an unmatched final
+  record; an unmatched frame has no event timestamp. Larger differences error.
+  Legacy session cursor, zoom and rule times are migrated once; saved STA results
+  require recalculation and generate a warning.
+- Global STA uses the standard error based on contributing events at each lag,
+  independent of control repetitions. This is an approximate SEM band: correlated
+  or overlapping events can reduce the effective sample count. Whole-session
+  random-time controls and local dither retain their intended sampling domains.
+- Speed onset/offset uses an internal resting-noise estimate, with no extra GUI
+  parameter. A smoothed speed histogram identifies sustained low-motion windows;
+  the 75th percentile of original speed within their interiors sets near-zero.
+  No identifiable rest means no onset/offset estimate. X/Y expose neither event.
+  The heuristic needs validation on representative recordings.
+- Corrected DLC Fix filename case, trace click editing, graded likelihoods and
+  CSV scorer/column handling. CSV export remains a helper, without a new GUI.
+- Initialized TTL summaries before notifications, preserved channel-map labels,
+  guarded empty Refresh actions, and separated mask preview notifications.
+- Gapped DLC speed can be imported without an open pose viewer; frame-indexed
+  speed scales with current calibration. Mask smoothing requires a positive window.
+- Binary Open Ephys streams use per-channel bit-volts metadata for units.
+  Multiple recordings/streams require selection. Non-binary recordings retain
+  explicitly labeled counts with a warning rather than guessed scaling.
+- Added regression coverage for timing, migration, statistics, resting thresholds,
+  units, CSV, likelihoods and GUI guards. Static parsing passes; MATLAB execution
+  remains required before merging or relying on changed scientific outputs.
+
+## Frame-step playback correction
+
+Restored the intended playback contract after owner testing: each timer callback
+advances from the displayed frame by the selected PlayStep (1/2/4/8/16).
+A fixed-spacing timer waits for the callback to complete, so slow rendering only
+slows playback. No tic/toc or frame-rate multiplier is used. The final step clamps
+to the last timestamped frame and stops. TTL timestamps still synchronize viewers.
+Static parsing passes; MATLAB video/GUI playback must be verified manually.

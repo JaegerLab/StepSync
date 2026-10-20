@@ -19,4 +19,6 @@ end
 
 tabledlc.Properties.VariableNames = headers;
 tabledlc.Properties.UserData = unique(txt(2,:),'stable'); %bodyparts
-tabledlc.Properties.Description = filename; %scorer
+tabledlc.Properties.Description = filename; %source filename
+tabledlc = addprop(tabledlc,'Scorer','table');
+tabledlc.Properties.CustomProperties.Scorer = txt{1,1};

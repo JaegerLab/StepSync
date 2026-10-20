@@ -26,12 +26,12 @@ function fig = gait_viewer(default_path)
         subgrid1.ColumnWidth = {'1x', 130,130,130,120,120};
         hd.info = uilabel(subgrid1,'Text',' Info:', 'BackgroundColor','w');
         hd.frameRate = uieditfield(subgrid1,'numeric','Value',1, ...
-            'ValueDisplayFormat','Frame rate: %.2f Hz');
+            'ValueDisplayFormat','Frame rate: %.2f Hz', 'Editable','off');
         hd.resolution = uieditfield(subgrid1,'numeric','Value',30, ...
             'ValueDisplayFormat','Resolution: %d px/cm', ...
             'ValueChangedFcn', @(~,~)updateInfo);
         hd.pawthresh = uieditfield(subgrid1,'numeric','Value',10, ...
-            'ValueDisplayFormat','Paw thresh: %.2f cm/s', ...
+            'ValueDisplayFormat','Paw thresh: %.2f cm', ...
             'ValueChangedFcn', @pawThreshChanged);
         hd.minTimeInterval = uieditfield(subgrid1,'numeric','Value',0.2, ...
             'ValueDisplayFormat','Min interval: %.2f s', ...
@@ -49,7 +49,7 @@ function fig = gait_viewer(default_path)
         hd.ax.ButtonDownFcn = @axClicked;
         hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
         hd.ax.Layout.Row = [3 4]; hd.ax.Layout.Column = 1;
-        ylabel(hd.ax, 'Speed (cm/s)'); xlabel(hd.ax, 'Time (s)')
+        ylabel(hd.ax, 'X (cm)'); xlabel(hd.ax, 'Time (s)')
         disableDefaultInteractivity(hd.ax)
 
         subgrid3 = uigridlayout(grid1, [4 1], Padding = [0 0 0 0], ...
@@ -84,6 +84,7 @@ function fig = gait_viewer(default_path)
         hd.zoomListener = addlistener(data, 'ZoomChanged', @(src, evt)updateGaitZoom(src.currentZoom));
         hd.dataListener = addlistener(data, 'DataChanged', @(~,~)updateInfo());
         hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)updateInfo());
+        hd.previewListener = addlistener(data, 'MaskPreviewChanged', @(~,~)previewChanged());
 
         data.gait(1).hd = hd;
     end
@@ -166,7 +167,7 @@ function fig = gait_viewer(default_path)
 
         end
         % reconstruct t
-        data.gait.t = (1:numel(data.gait.paw(1).raw_x))'./hd.frameRate.Value;
+        data.gait.t = data.getFrameTimes(numel(data.gait.paw(1).raw_x));
     end
    
     function plotTrace()
@@ -247,8 +248,17 @@ function fig = gait_viewer(default_path)
         traceType = lower(hd.trace.Value);
         trace = data.gait.paw(pawIdx).(traceType);
         threshold = selectedThreshold(trace, pawIdx, traceType);
+        updateStepOptions(traceType);
+        nearZero = NaN;
+        if strcmp(traceType,'speed')
+            [nearZero, restInfo] = GAIT.auto_rest_threshold(trace, data.getFrameRate());
+            data.gait.paw(pawIdx).nearZeroStatus = restInfo.status;
+            hd.stepList.Tooltip = sprintf('Near-zero: %.3g cm/s. %s',nearZero,restInfo.status);
+        end
+        data.gait.paw(pawIdx).nearZeroThreshold = nearZero;
         interval = max(1, round(hd.minTimeInterval.Value * data.getFrameRate()));
-        steps = GAIT.detect_steps(trace, data.gait.mask, threshold, interval);
+        detectionMask = data.gait.mask & isfinite(data.gait.t);
+        steps = GAIT.detect_steps(trace, detectionMask, threshold, interval, nearZero);
         % Commit only after every event type has been calculated successfully.
         fields = fieldnames(steps);
         for k = 1:numel(fields)
@@ -258,6 +268,28 @@ function fig = gait_viewer(default_path)
         data.gait.stepsPaw = pawIdx;
         data.gait.stepsTrace = traceType;
         data.gait.stepsValid = true;
+    end
+
+    function previewChanged()
+        if data.has('gait'), plotTrace(); end
+    end
+
+    function updateStepOptions(traceType)
+        hd = data.gait.hd;
+        selected = hd.stepList.Value;
+        items = {'rising','falling','peak','valley'};
+        if strcmp(traceType,'speed')
+            items = {'rising','falling','onset','offset','peak','valley'};
+            hd.pawthresh.ValueDisplayFormat = 'Paw thresh: %.2f cm/s';
+            ylabel(hd.ax,'Speed (cm/s)');
+        else
+            hd.pawthresh.ValueDisplayFormat = 'Paw thresh: %.2f cm';
+            ylabel(hd.ax,[upper(traceType) ' (cm)']);
+        end
+        hd.stepList.ItemsData = {};
+        hd.stepList.Items = items;
+        hd.stepList.ItemsData = items;
+        if ismember(selected,items), hd.stepList.Value = selected; else, hd.stepList.Value = 'rising'; end
     end
 
     function plotSteps()
@@ -468,7 +500,9 @@ function fig = gait_viewer(default_path)
     end
 
     function refresh(~,~)
-        data.setZoom(data.gait.t([1 end]));
+        if ~data.has('gait'), return; end
+        t = data.gait.t(isfinite(data.gait.t));
+        if numel(t)>1, data.setZoom(t([1 end])); end
 
         updateInfo();
     end
@@ -485,7 +519,7 @@ function fig = gait_viewer(default_path)
         hd = data.gait.hd;
         if data.has('gait')
             newZoom(1) = max([0 newZoom(1)]);
-            newZoom(2) = min([newZoom(2) data.gait.t(end)]);
+            newZoom(2) = min([newZoom(2) max(data.gait.t, [], 'omitnan')]);
             if newZoom(2) <= newZoom(1), return; end
             xlim(hd.ax, newZoom);
             data.currentZoom = newZoom;

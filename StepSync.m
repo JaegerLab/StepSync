@@ -81,6 +81,7 @@ function hfig = StepSync(default_path)
         if ~all(isfield(savedata, required))
             uialert(fig, 'This is not a StepSync session file.', 'Load error'); return;
         end
+        savedata = shared.migrate_session_time(savedata);
         validateattributes(savedata.frameRate, {'numeric'}, {'scalar','finite','nonnegative'});
         validateattributes(savedata.currentTime, {'numeric'}, {'scalar','finite','nonnegative'});
         validateattributes(savedata.currentZoom, {'numeric'}, {'vector','numel',2,'finite'});
@@ -113,6 +114,14 @@ function hfig = StepSync(default_path)
             end
 
         end
+        % Populate legacy trigger metadata before any viewer receives InfoChanged.
+        if data.has('emg') && isfield(data.emg,'trigger')
+            intervals = diff(data.emg.trigger.time);
+            intervals = intervals(isfinite(intervals) & intervals>0);
+            data.emg.trigger.freq = NaN;
+            if ~isempty(intervals), data.emg.trigger.freq = 1/median(intervals); end
+            data.emg.trigger.number = numel(data.emg.trigger.time);
+        end
         % activate data display in each module
         notify(data, 'InfoChanged');
         notify(data, 'DataChanged');
@@ -133,11 +142,12 @@ function hfig = StepSync(default_path)
             'Message','Saving', ...
             'Indeterminate','on');
         
+        timebaseVersion = 2;
         defaultPath = hd.path.Value;
         frameRate = data.frameRate;
         currentTime = data.currentTime;
         currentZoom = data.currentZoom;
-        save(filename,"defaultPath","frameRate","currentTime","currentZoom", "-v7.3");
+        save(filename,"defaultPath","frameRate","currentTime","currentZoom","timebaseVersion", "-v7.3");
 
         % ===== change handle to parameters ========
         % save figure positions

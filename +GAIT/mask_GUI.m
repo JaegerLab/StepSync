@@ -31,6 +31,7 @@ function maskFig = mask_GUI(mousePos)
     state.Speed = double.empty(0,1);
     state.SpeedTime = double.empty(0,1);
     state.SpeedSource = "";
+    state.SpeedUnits = 'cm/s';
     state.SmoothEnabled = false;
     state.SmoothWindow = 1;
     state.SpeedOperator = '>';
@@ -111,7 +112,7 @@ function maskFig = mask_GUI(mousePos)
         speedGrid, ...
         'numeric', ...
         'Value', 1, ...
-        'Limits', [0 Inf], ...
+        'Limits', [0 Inf], 'LowerLimitInclusive', 'off', ...
         'Enable', 'off', ...
         'ValueChangedFcn', @speedParameterChanged, ...
         'ValueDisplayFormat','Smooth Window: %.2f s');
@@ -362,31 +363,27 @@ function maskFig = mask_GUI(mousePos)
     end
 
     function importSpeedFromDLC(~, ~)
-        % get bodypart list
-        part_list = data.dlc.hd.list_bodyparts.Items;
-        
-        % select paws
-        [bodyIdx, tf] = listdlg(...
-            'PromptString','Select bodypart:', ...
-            'ListString',part_list, ...
-            'SelectionMode','single');
+        if data.has('dlc')
+            part_list = data.dlc.hd.list_bodyparts.Items;
+        elseif data.has('gait')
+            part_list = {data.gait.paw.name};
+        else
+            uialert(maskFig, 'Import gait or DLC data first.', 'No pose data'); return;
+        end
+        [bodyIdx, tf] = listdlg('PromptString','Select bodypart:', ...
+            'ListString',part_list, 'SelectionMode','single');
+        drawnow; figure(maskFig);
         if ~tf, return; end
-
         body_name = part_list{bodyIdx};
-
-        % get body xy
-        x = data.dlc.table.([body_name, '_x']);
-        y = data.dlc.table.([body_name, '_y']);
-
-        speed = GAIT.smooth_speed(x, y, 1);
-        speed = speed(:).*data.gait.speedFactor; 
-
-        time = data.gait.t;
-    
-        setSpeed( ...
-            speed, ...
-            time, ...
-            "DLC: " + string(body_name));
+        if data.has('dlc')
+            x = data.dlc.table.([body_name '_x']);
+            y = data.dlc.table.([body_name '_y']);
+        else
+            x = data.gait.paw(bodyIdx).raw_x;
+            y = data.gait.paw(bodyIdx).raw_y;
+        end
+        speed = GAIT.smooth_speed(x,y,1);
+        setSpeed(speed(:), [], "DLC: " + string(body_name), 'pixels/frame');
     end
 
     function smoothSettingChanged(~, ~)
@@ -401,7 +398,8 @@ function maskFig = mask_GUI(mousePos)
         updateSpeedPlot();
     end
 
-    function setSpeed(speed, time, source)
+    function setSpeed(speed, time, source, units)
+        if nargin<4, units = 'cm/s'; end
     
         speed = double(speed(:));
         time  = double(time(:));
@@ -411,9 +409,9 @@ function maskFig = mask_GUI(mousePos)
                 'Speed data cannot be empty.');
         end
     
-        if any(~isfinite(speed))
+        if any(isinf(speed))
             error('DrawGUI:InvalidSpeed', ...
-                'Speed data contains Inf or NaN values.');
+                'Speed data contains Inf values.');
         end
     
         if ~isempty(time)
@@ -432,6 +430,7 @@ function maskFig = mask_GUI(mousePos)
         state.Speed       = speed;
         state.SpeedTime   = time;
         state.SpeedSource = source;
+        state.SpeedUnits = units;
     
         updateSpeedStatus();
         updateSpeedPlot();
@@ -448,6 +447,9 @@ function maskFig = mask_GUI(mousePos)
     
         speed = state.Speed;
         time  = state.SpeedTime;
+        if strcmp(state.SpeedUnits, 'pixels/frame')
+            speed = speed * data.getFrameRate()/data.gait.hd.resolution.Value;
+        end
     
         if isempty(speed)
             return
@@ -1072,7 +1074,7 @@ function maskFig = mask_GUI(mousePos)
 
             if isfield(saved, 'Speed') && ~isempty(saved.Speed)
                 speed = double(saved.Speed(:));
-                if any(~isfinite(speed))
+                if any(isinf(speed))
                     return
                 end
                 candidate.Speed = speed;
@@ -1085,6 +1087,10 @@ function maskFig = mask_GUI(mousePos)
                     return
                 end
                 candidate.SpeedTime = speedTime;
+            end
+
+            if isfield(saved,'SpeedUnits') && ismember(string(saved.SpeedUnits), ["cm/s","pixels/frame"])
+                candidate.SpeedUnits = char(saved.SpeedUnits);
             end
 
             if isfield(saved, 'SpeedSource') && ...
@@ -1176,7 +1182,7 @@ function maskFig = mask_GUI(mousePos)
 
     function previewMask(~, ~)
         data.gait.maskTemp = buildCombinedMask();
-        notify(data, 'InfoChanged');
+        notify(data, 'MaskPreviewChanged');
     end
 
     function generateMaskAndClose(~, ~)

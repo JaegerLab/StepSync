@@ -95,3 +95,20 @@ verifyEqual(testCase, numel(newT), 1000);
 [~, ~, fs] = EMG.emg_prep(x, t, struct('Rectify', true), 1000);
 verifyEqual(testCase, fs, 1000);
 end
+
+function testSaveZoomWindowKeepsTimes(testCase)
+file = [tempname '.mat'];
+addTeardown(testCase, @()delete(file));
+emg = sampleEmg();
+EMG.save_emg(file, emg, {'Raw', 'Processed 1'}, [0.2 0.5]);
+f = load(file);
+verifyEqual(testCase, f.raw.t, (2:5)'/10, 'AbsTol', 1e-12);   % absolute times, not shifted
+verifyEqual(testCase, f.raw.data, emg.raw.data(3:6, :));
+verifyEqual(testCase, f.processed1.t, [0.2; 0.4], 'AbsTol', 1e-12);
+verifyEqual(testCase, f.emg.time_range, [0.2 0.5]);
+verifyEqual(testCase, f.emg.trigger, emg.trigger);   % metadata unchanged
+EMG.save_emg(file, emg, {'Raw'});
+f = load(file);
+verifyEqual(testCase, f.raw, emg.raw);
+verifyEmpty(testCase, f.emg.time_range);
+end

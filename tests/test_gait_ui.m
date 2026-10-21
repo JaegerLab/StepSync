@@ -138,9 +138,9 @@ gaitFig = shared.open_module('gait');
 verifyEqual(testCase,shared.open_module('dlc'),dlcFig);   % no second window
 windowMenu = findall(gaitFig,'Type','uimenu','Tag','Window');
 items = flip(windowMenu.Children);
-verifyEqual(testCase,{items.Text},{'Video','EMG','DLC','Gait','Open All','Bring All to Front'});
+verifyEqual(testCase,{items.Text},{'Video','EMG','DLC','Gait','Open All','Bring All to Top'});
 verifyEqual(testCase,logical([items(1:4).Checked]),[false false true true]);
-verifyEqual(testCase,{items(1:5).Accelerator},{'V','E','D','G','A'});
+verifyEqual(testCase,{items([1:5 end]).Accelerator},{'I','E','D','G','A','T'});
 fileMenu = findall(gaitFig,'Type','uimenu','Tag','File');
 fileItems = flip(fileMenu.Children);
 shortcuts = containers.Map({fileItems.Text},{fileItems.Accelerator});
@@ -264,4 +264,26 @@ verifyEmpty(testCase,hd.datatype.Items);
 verifyFalse(testCase,logical(hd.deleteType.Enable));
 verifyEqual(testCase,S.emg.trigger.freq,10);
 verifyEqual(testCase,S.getFrameRate(),10);   % frame timing still follows the trigger
+end
+function testDlcTimelineStaysBelowTraces(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+cleanup = onCleanup(@()shared.exit_all(false));
+DLC.dlc_viewer();
+hd = S.dlc.hd;
+n = 50;
+S.dlc.table = table((1:n)',(1:n)',ones(n,1),'VariableNames',{'paw_x','paw_y','paw_likelihood'});
+S.dlc.table.Properties.UserData = {'paw'};
+S.dlc.seg = []; S.dlc.seg_bodypart = '';
+hd.list_bodyparts.Items = {'paw'}; hd.list_bodyparts.Enable = 'on';
+% session load order: traces (DLCChanged) before the time (TimeChanged)
+notify(S,'InfoChanged');
+S.notifyDLC('load');
+notify(S,'TimeChanged');
+hd = S.dlc.hd;
+yyaxis(hd.ax,'left');
+children = allchild(hd.ax);   % first child is drawn on top; the time line is hidden from Children
+verifyGreaterThan(testCase,find(children==hd.timeline_dlc),find(children==hd.xplot));
+verifyGreaterThan(testCase,find(children==hd.timeline_dlc),find(children==hd.yplot));
 end

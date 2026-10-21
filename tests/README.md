@@ -53,7 +53,7 @@ Manual checks of the menu bar and windows:
 - The launcher closes when a module opens from a button, the Window menu or
   Load session; running `StepSync` while modules are open raises them instead.
 - Window menu: checkmarks follow open modules; open sub-windows are listed,
-  indented, under their module and disappear when closed; Bring All to Front
+  indented, under their module and disappear when closed; Bring All to Top
   leaves the invoking window on top.
 - Close and the window's X ask before closing a module window; sub-windows
   close without asking; Exit all asks once.
@@ -64,8 +64,8 @@ Manual checks of the menu bar and windows:
 - Titles show the opened file, also after Load session; file dialogs start in
   the folder of the last file opened.
 - Shortcuts in every window with a menu: Ctrl+O Open, Ctrl+S Save, Ctrl+W
-  Close, Ctrl+V/E/D/G open or raise Video/EMG/DLC/Gait, Ctrl+A Open All.
-  Check that Ctrl+V and Ctrl+A still paste and select text in edit fields.
+  Close, Ctrl+I/E/D/G open or raise Video/EMG/DLC/Gait, Ctrl+A Open All,
+  Ctrl+T Bring All to Top.
 
 Manual checks with representative recordings are still required:
 

@@ -9,10 +9,10 @@ classdef MenuBar < handle
 %                     (default true)
 %
 %   File:   <fileItems> | Load session, Save session, Export to Workspace | Close, Exit all
-%   Window: Video, EMG, DLC, Gait (open sub-windows listed below their module) | Open All, Bring All to Front
+%   Window: Video, EMG, DLC, Gait (open sub-windows listed below their module) | Open All, Bring All to Top
 %
-% Shortcuts: Ctrl+O Open, Ctrl+S Save, Ctrl+W Close, Ctrl+V Video, Ctrl+E EMG,
-% Ctrl+D DLC, Ctrl+G Gait, Ctrl+A Open All.
+% Shortcuts: Ctrl+O Open, Ctrl+S Save, Ctrl+W Close, Ctrl+I Video, Ctrl+E EMG,
+% Ctrl+D DLC, Ctrl+G Gait, Ctrl+A Open All, Ctrl+T Bring All to Top.
 %
 % The object lives as long as its window and rebuilds the Window menu on
 % WindowsChanged. It does not need to be stored.
@@ -73,7 +73,7 @@ classdef MenuBar < handle
             windows = shared.open_windows();
             modules = {'video', 'emg', 'dlc', 'gait'};
             labels  = {'Video', 'EMG', 'DLC', 'Gait'};
-            keys    = {'V', 'E', 'D', 'G'};
+            keys    = {'I', 'E', 'D', 'G'};
             indent = repmat(char(160), 1, 4);   % plain spaces are trimmed
             for k = 1:numel(modules)
                 module = modules{k};
@@ -87,7 +87,7 @@ classdef MenuBar < handle
             end
             uimenu(obj.WindowMenu, 'Text', 'Open All', 'Separator', 'on', 'Accelerator', 'A', ...
                 'MenuSelectedFcn', @(~,~)openAll(modules));
-            uimenu(obj.WindowMenu, 'Text', 'Bring All to Front', ...
+            uimenu(obj.WindowMenu, 'Text', 'Bring All to Top', 'Accelerator', 'T', ...
                 'MenuSelectedFcn', @(~,~)shared.bring_all_to_front(obj.Figure));
         end
     end

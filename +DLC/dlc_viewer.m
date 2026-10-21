@@ -109,10 +109,10 @@ function fig = dlc_viewer()
 
         % update frame rate and total frames
         notify(data, 'InfoChanged')
+        % draw time line first: it stays below the traces, so clicks reach them
+        updateDLCtime(data.currentTime);
         % draw trajectory plot
         data.notifyDLC('open', tabledlc.Properties.UserData);
-        % draw time line
-        updateDLCtime(data.currentTime);
     end
 
     function listChanged()
@@ -149,6 +149,12 @@ function fig = dlc_viewer()
 
         % plot xy plots
         hold(hd.ax, "on");
+        % The time line must exist before the traces are created: plot order
+        % keeps it below them (no uistack: it fails with yyaxis). Session
+        % load draws the traces before TimeChanged, so create it here.
+        if ~isfield(hd, 'timeline_dlc') || ~ishghandle(hd.timeline_dlc)
+            hd = drawTimeline(hd);
+        end
         hd = shared.myPlot(@plot, hd, 'xplot', hd.ax, t, xdata, ...
                 '-', 'Color', S.xColor, 'LineWidth', S.trace, ...
                 'HitTest', 'on', 'ButtonDownFcn', @axClicked, 'DisplayName', S.legend.x, ...
@@ -533,11 +539,7 @@ function fig = dlc_viewer()
                 length(xdata), max(data.dlc.t, [], 'omitnan'), ...
                 xdata(f), ydata(f), pdata(f));
 
-            % draw time line on the left side (see drawP)
-            if numel(hd.ax.YAxis) > 1, yyaxis(hd.ax, 'left'); end
-            hd = shared.myPlot(@xline, hd, 'timeline_dlc', hd.ax, ...
-                data.currentTime,  'k', ...
-                'HitTest', 'off', 'HandleVisibility', 'off');
+            hd = drawTimeline(hd);
             data.dlc.hd = hd;
 
             data.setTime(currentTime);
@@ -546,6 +548,14 @@ function fig = dlc_viewer()
             zoomlim = shared.zoom(get(hd.ax,'xLim'), currentTime, 'pan');
             data.setZoom(zoomlim);
         end
+    end
+
+    % time line on the left side (see drawP)
+    function hd = drawTimeline(hd)
+        if numel(hd.ax.YAxis) > 1, yyaxis(hd.ax, 'left'); end
+        hd = shared.myPlot(@xline, hd, 'timeline_dlc', hd.ax, ...
+            data.currentTime,  'k', ...
+            'HitTest', 'off', 'HandleVisibility', 'off');
     end
 
     function zoomIn(~, ~)

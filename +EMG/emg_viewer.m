@@ -220,6 +220,8 @@ function fig = emg_viewer()
             if ~ok || isempty(idx), return; end
             selected = types(idx);
         end
+        [range, ok] = shared.ask_save_range(fig, 'EMG');
+        if ~ok, return; end
         [~, base] = fileparts(data.emg.display_name);
         [file, path] = uiputfile('*.mat', 'Save EMG', ...
             fullfile(data.defaultPath, [base '_StepSync.mat']));
@@ -235,7 +237,7 @@ function fig = emg_viewer()
         progbar = uiprogressdlg(fig, 'Title', 'Saving', 'Message', 'Saving EMG', ...
             'Indeterminate', 'on');
         closeBar = onCleanup(@()delete(progbar));   % also on errors
-        EMG.save_emg(filename, data.emg, selected);
+        EMG.save_emg(filename, data.emg, selected, range);
         clear closeBar
         data.rememberPath(filename);
         data.emg.display_name = filename;   % the title shows the saved file

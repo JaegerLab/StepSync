@@ -7,10 +7,9 @@ function testSwitchingPawsAndTracesRecalculates(testCase)
 assumeTrue(testCase, usejava('desktop'), 'Run UI tests in desktop MATLAB.');
 S = shared.SessionData.instance();
 assumeTrue(testCase, isempty(fieldnames(S.fig)), 'Close StepSync before running UI tests.');
-oldRate = S.frameRate;
 S.frameRate = 20;
-fig = GAIT.gait_viewer(pwd);
-cleanup = onCleanup(@()cleanupViewer(fig,S,oldRate)); %#ok<NASGU>
+GAIT.gait_viewer();
+cleanup = onCleanup(@()shared.exit_all(false));
 hd = S.gait.hd;
 hd.pawList.Items = {'a','b'};
 hd.pawList.ItemsData = [1 2];
@@ -44,6 +43,7 @@ verifyNotEmpty(testCase,GAIT.current_steps(S));
 % Mask GUI must work with the new data model (no per-paw .trace).
 verifyFalse(testCase,isfield(S.gait.paw,'trace'));
 maskFig = GAIT.mask_GUI([100 100]);
+maskCleanup = onCleanup(@()delete(maskFig)); % not stored in hd: exit_all misses it
 preview = findall(maskFig,'Type','uibutton','Text','Preview');
 callback = preview.ButtonPushedFcn; callback(preview,[]);
 verifyTrue(testCase,isfield(S.gait,'maskTemp'));
@@ -90,18 +90,12 @@ verifyFalse(testCase,GAIT.steps_current(S));
 verifyEmpty(testCase,GAIT.current_steps(S));
 end
 
-function cleanupViewer(fig,S,rate)
-if isgraphics(fig), close(fig); end
-S.frameRate = rate;
-end
-
 function testEmgInfoPreservesMappedChannelIdentity(testCase)
 assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
 S = shared.SessionData.instance();
 assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
-oldRate = S.frameRate;
-fig = EMG.emg_viewer(pwd);
-cleanup = onCleanup(@()cleanupViewer(fig,S,oldRate)); %#ok<NASGU>
+EMG.emg_viewer();
+cleanup = onCleanup(@()shared.exit_all(false));
 hd = S.emg.hd;
 S.emg.analog_data = zeros(101,2);
 S.emg.analog_channels = {'raw1','raw2'};
@@ -122,8 +116,8 @@ function testRefreshWithoutDataIsSafe(testCase)
 assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
 S = shared.SessionData.instance();
 assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
-figures = {EMG.emg_viewer(pwd), DLC.dlc_viewer(pwd), GAIT.gait_viewer(pwd)};
-cleanup = onCleanup(@()closeViewers(figures)); %#ok<NASGU>
+figures = {EMG.emg_viewer(), DLC.dlc_viewer(), GAIT.gait_viewer()};
+cleanup = onCleanup(@()shared.exit_all(false));
 for k = 1:numel(figures)
     button = findall(figures{k},'Tooltip','Refresh');
     callback = button.ButtonPushedFcn; callback(button,[]);
@@ -131,8 +125,34 @@ end
 verifyTrue(testCase,all(cellfun(@isgraphics,figures)));
 end
 
-function closeViewers(figures)
-for k = numel(figures):-1:1
-    if isgraphics(figures{k}), close(figures{k}); end
-end
+function testWindowMenuAndExitAll(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+cleanup = onCleanup(@()shared.exit_all(false));
+launcher = StepSync(pwd);
+verifyEqual(testCase,S.defaultPath,pwd);
+dlcFig = shared.open_module('DLC');
+verifyFalse(testCase,isgraphics(launcher));   % opening a module closes the launcher
+gaitFig = shared.open_module('gait');
+verifyEqual(testCase,shared.open_module('dlc'),dlcFig);   % no second window
+windowMenu = findall(gaitFig,'Type','uimenu','Text','Window');
+items = flip(windowMenu.Children);
+verifyEqual(testCase,{items.Text},{'Video','EMG','DLC','Gait','Bring All to Front'});
+verifyEqual(testCase,logical([items(1:4).Checked]),[false false true true]);
+% a sub-window is listed, checked, below its module, and removed when closed
+S.gait.hd.maskFig = uifigure('Name','Edit Mask');
+notify(S,'WindowsChanged');
+items = flip(windowMenu.Children);
+verifyEqual(testCase,strtrim(strrep(items(5).Text,char(160),' ')),'Edit Mask');
+verifyTrue(testCase,logical(items(5).Checked));
+delete(S.gait.hd.maskFig);
+notify(S,'WindowsChanged');
+verifyNumElements(testCase,windowMenu.Children,5);
+% Exit all closes everything and resets the session
+S.frameRate = 30;
+shared.exit_all(false);
+verifyFalse(testCase,isvalid(S));
+verifyFalse(testCase,isgraphics(dlcFig) || isgraphics(gaitFig));
+verifyEqual(testCase,shared.SessionData.instance().frameRate,0);
 end

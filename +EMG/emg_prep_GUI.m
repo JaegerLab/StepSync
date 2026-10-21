@@ -6,7 +6,7 @@ function fig = emg_prep_GUI(mousePos)
     %% draw GUI
     % grid 4x3
     mousePos(2)=mousePos(2)-150;
-    fig = uifigure('Name', 'EMG Pre-Process', 'Position', [mousePos 400 150], ...
+    fig = uifigure('Name', 'EMG Pre-Process', 'Position', shared.place_window([mousePos 400 150]), ...
         'CloseRequestFcn', @onClose);
     grid1 = uigridlayout(fig, [4 3]);
 
@@ -85,6 +85,7 @@ function fig = emg_prep_GUI(mousePos)
         end
         notify(data, 'EMGChanged');
         delete(src)
+        notify(data, 'WindowsChanged');
     end
 end
 

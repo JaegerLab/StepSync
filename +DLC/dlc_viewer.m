@@ -1,30 +1,25 @@
-function fig = dlc_viewer(default_path)
+function fig = dlc_viewer()
     data = shared.SessionData.instance();
 
-    drawGUI(default_path);
+    drawGUI();
 
-    function drawGUI(default_path)
+    function drawGUI()
         % DLC viewer window with uigridlayout
         fig = uifigure('Name', 'DLC Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn', @onClose);
         data.fig(1).dlc = fig;
+        shared.MenuBar(fig, {'Open', @openDLC; 'Save', []});
         drawnow
-        grid1 = uigridlayout(fig, [4 2]);
+        grid1 = uigridlayout(fig, [3 2]);
         grid1.Padding = [20,20,20,20];
         grid1.ColumnWidth = {'1x', 140};
-        grid1.RowHeight = {30, 30, '1x', 30};
-        
+        grid1.RowHeight = {30, '1x', 30};
+
         hd = struct();
-        %% Row 1: Folder and open button
-        hd.path = uieditfield(grid1, 'text'); 
-        if nargin>=1
-            hd.path.Value = default_path;
-        end
-        uibutton(grid1, 'Text', 'Open DLC', 'ButtonPushedFcn', @openDLC);
-    
-        %% Row 2: DLC processing
+
+        %% Row 1: DLC processing
         subgrid1 = uigridlayout(grid1, [1 7], 'Padding', [0 0 0 0], ...
-            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 2, 'Column', 1));
+            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
         subgrid1.ColumnWidth = {'1x', 30, 30, 30, 100, 80, 100};
             hd.info = uilabel(subgrid1,'Text',' Info:', 'BackgroundColor','w');
             hd.chk_x = uicheckbox(subgrid1,'Text','X','Value',1, ...
@@ -42,14 +37,15 @@ function fig = dlc_viewer(default_path)
             
         % subgrid3 = uigridlayout(grid1, [1 2], 'Padding', [0 0 0 0]);
         % subgrid3.Layout.Row = 2; subgrid3.Layout.Column = 2;
-        uibutton(grid1,'Text','DLC Fix', 'ButtonPushedFcn',@openFix);
+        uibutton(grid1,'Text','DLC Fix', 'ButtonPushedFcn',@openFix, ...
+            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 2));
             % hd.manualFix = uicheckbox(subgrid3,'Text','Man. Fix','Value', 0, ...
             %     'ValueChangedFcn',@manualFix);
-        
-    
-        %% Row 3: DLC plot
-        hd.ax = uiaxes(grid1); 
-        hd.ax.Layout.Row = [3 4]; hd.ax.Layout.Column = 1;
+
+
+        %% Row 2: DLC plot
+        hd.ax = uiaxes(grid1);
+        hd.ax.Layout.Row = [2 3]; hd.ax.Layout.Column = 1;
         hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
         axis(hd.ax, 'ij'); 
         xlabel(hd.ax, 'Frame'); ylabel(hd.ax, 'Location (pixel)');
@@ -60,10 +56,11 @@ function fig = dlc_viewer(default_path)
 
         hd.list_bodyparts = uilistbox(grid1, 'Multiselect', 'off', ...
             'Enable','off', 'ValueChangedFcn', @(src,evt)listChanged());
-        hd.list_bodyparts.Layout.Row = 3; hd.list_bodyparts.Layout.Column = 2;
-    
-        %% Row 4:  zoom in, zoom out, update buttons        
+        hd.list_bodyparts.Layout.Row = 2; hd.list_bodyparts.Layout.Column = 2;
+
+        %% Row 3:  zoom in, zoom out, update buttons
         subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
+        subgrid2.Layout.Row = 3; subgrid2.Layout.Column = 2;
         uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn, ...
             'Tooltip','Zoom in');
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
@@ -81,32 +78,22 @@ function fig = dlc_viewer(default_path)
         hd.infoListener = addlistener(data, 'InfoChanged', @(src, evt)updateInfo());
 
         data.dlc(1).hd = hd;
+        notify(data, 'WindowsChanged');
     end
 
     function openDLC(~,~)
         hd = data.dlc.hd;
-        filename = hd.path.Value;
-        if isempty(filename)
-            filename='*.csv';
-        else
-            [pathname, file, ext] = fileparts(filename);
-            if isempty(ext)
-                filename = fullfile(pathname, file, '*.csv');
-            else
-                filename = fullfile(pathname, ['*' ext]);
-            end
-        end
-        [filename, pathname]=uigetfile(filename, 'Open DeepLabCut file');
+        [filename, pathname]=uigetfile(fullfile(data.defaultPath, '*.csv'), 'Open DeepLabCut file');
         drawnow; figure(fig);
         if isequal(pathname,0), return; end
         filename=fullfile(pathname, filename);
         if ~exist(filename, "file"), return; end
+        data.rememberPath(filename);
 
-        hd.path.Value = filename;
-    
         % This reading function handles different kinds of data formats
         tabledlc = DLC.read_dlc(filename);
         data.dlc.table = tabledlc;
+        data.dlc.filename = filename;
         data.dlc.seg = [];
         data.dlc.seg_bodypart = '';
 
@@ -430,6 +417,9 @@ function fig = dlc_viewer(default_path)
     function updateInfo()
         if ~data.has('dlc'), return; end
         hd = data.dlc.hd;
+        if isfield(data.dlc, 'filename')
+            fig.Name = ['DLC Viewer: ' data.dlc.filename];
+        end
 
         % collect info
         frameRate = data.getFrameRate();
@@ -450,11 +440,12 @@ function fig = dlc_viewer(default_path)
         if ~isfield(hd, 'fixGUI') || ~isgraphics(hd.fixGUI, 'figure')
             % open a new window
             hd.fixGUI = DLC.dlc_fix_GUI(mousePos);
+            data.dlc.hd = hd;
+            notify(data, 'WindowsChanged');
         else
             % if window is already open, activate it.
             figure(hd.fixGUI)
         end
-        data.dlc.hd = hd;
     end
 
     % === sync time and zoom ===========
@@ -601,6 +592,7 @@ function fig = dlc_viewer(default_path)
 
     % close function =================================
     function onClose(src,~)
+        if ~shared.confirm_close(fig, 'DLC Viewer'), return; end
         hd=data.dlc.hd;
         % close fix GUI first.
         if isfield(hd, 'fixGUI') && isgraphics(hd.fixGUI)
@@ -624,6 +616,7 @@ function fig = dlc_viewer(default_path)
         data.fig = rmfield(data.fig, 'dlc');
         data.notifyDLC('close');   % e.g. the video viewer hides its DLC markers
         delete(src);  % finally close the GUI
+        data.moduleClosed();
     end
 end
 

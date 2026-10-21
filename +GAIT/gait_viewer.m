@@ -1,31 +1,25 @@
-function fig = gait_viewer(default_path)
+function fig = gait_viewer()
 
     data = shared.SessionData.instance();
     % true while the "DLC changed" prompt is open; further DLCChanged
     % events are ignored until the user answers it.
     dlcPromptPending = false;
-    drawGUI(default_path)
-    
-    function drawGUI(default_path)
+    drawGUI()
+
+    function drawGUI()
         hd = struct;
         % gait viewer window with uigridlayout
         fig = uifigure('Name', 'Gait Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn',@onClose);
         data.fig(1).gait = fig;
+        shared.MenuBar(fig, {'Open', []; 'Import DLC', @importPaws; 'Save', []});
         drawnow
         grid1 = uigridlayout(fig, Padding = [20,20,20,20], ...
-            ColumnWidth = {'1x', 140}, RowHeight = {30, 30, '1x', 30});
+            ColumnWidth = {'1x', 140}, RowHeight = {30, '1x', 30});
 
-        %% Row 1: Folder and open button
-        hd.path = uieditfield(grid1, 'text'); 
-        if nargin>=1
-            hd.path.Value = default_path;
-        end
-        uibutton(grid1, 'Text', 'Import DLC', 'ButtonPushedFcn', @importPaws);
-        
-        %% Row 2: DLC processing
+        %% Row 1: DLC processing
         subgrid1 = uigridlayout(grid1, [1 7], 'Padding', [0 0 0 0], ...
-            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 2, 'Column', 1));
+            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
         subgrid1.ColumnWidth = {'1x', 130,130,130,120,120};
         hd.info = uilabel(subgrid1,'Text',' Info:', 'BackgroundColor','w');
         hd.frameRate = uieditfield(subgrid1,'numeric','Value',1, ...
@@ -44,20 +38,21 @@ function fig = gait_viewer(default_path)
         uibutton(subgrid1, 'Text', 'Edit Mask', 'ButtonPushedFcn', @openMask);
 
         hd.trace = uidropdown(grid1, 'Items',{'X', 'Y', 'Speed'}, 'Value', 'X', ...
-            'ValueChangedFcn', @traceChanged);
+            'ValueChangedFcn', @traceChanged, ...
+            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 2));
 
-        
-        %% Row 3: DLC plot
+
+        %% Row 2: DLC plot
         hd.ax = uiaxes(grid1); hold(hd.ax, 'on');
         hd.ax.ButtonDownFcn = @axClicked;
         hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
-        hd.ax.Layout.Row = [3 4]; hd.ax.Layout.Column = 1;
+        hd.ax.Layout.Row = [2 3]; hd.ax.Layout.Column = 1;
         ylabel(hd.ax, 'X (cm)'); xlabel(hd.ax, 'Time (s)')
         disableDefaultInteractivity(hd.ax)
 
         subgrid3 = uigridlayout(grid1, [4 1], Padding = [0 0 0 0], ...
             RowHeight={'1x', 30, '1x', 30});
-        subgrid3.Layout.Row = 3; subgrid3.Layout.Column = 2;
+        subgrid3.Layout.Row = 2; subgrid3.Layout.Column = 2;
         hd.pawList = uilistbox(subgrid3, 'Multiselect', 'off', ...
             'ValueChangedFcn', @pawChanged, 'Enable','off');
         subgrid4 = uigridlayout(subgrid3, [1 2], Padding = [0 0 0 0]);
@@ -70,9 +65,9 @@ function fig = gait_viewer(default_path)
         hd.sta = uibutton(subgrid3, Text='Step Triggered Avg', Enable='off', ...
                 ButtonPushedFcn=@openSTA);
 
-        %% Row 4: zoom in, zoom out, update buttons
+        %% Row 3: zoom in, zoom out, update buttons
         subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
-        subgrid2.Layout.Row = 4; subgrid2.Layout.Column = 2;
+        subgrid2.Layout.Row = 3; subgrid2.Layout.Column = 2;
         uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn, ...
             'Tooltip','Zoom in');
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
@@ -91,27 +86,29 @@ function fig = gait_viewer(default_path)
         hd.dlcListener = addlistener(data, 'DLCChanged', @(~,evt)onDLCChanged(evt));
 
         data.gait(1).hd = hd;
+        notify(data, 'WindowsChanged');
     end
 
     function importPaws(~,~)
         hd = data.gait.hd;
         if ~data.has('dlc')
             % no dlc data, read dlc from file.
-            filename = hd.path.Value;
-            [filename, pathname]=uigetfile(filename, 'Open DeepLabCut file');
+            [filename, pathname]=uigetfile(fullfile(data.defaultPath, '*.csv'), 'Open DeepLabCut file');
             if isequal(pathname,0), return; end
             filename=fullfile(pathname, filename);
             if ~exist(filename, "file"), return; end
-        
+            data.rememberPath(filename);
+
             table_dlc = DLC.read_dlc(filename);
             part_list = table_dlc.Properties.UserData;
-            hd.path.Value = pathname;
+            dlcFile = filename;
             source = filename;
         else
             % read dlc from dlc_viewer
             table_dlc = data.dlc.table;
             part_list = data.dlc.hd.list_bodyparts.Items;
-            hd.path.Value = data.dlc.hd.path.Value;
+            dlcFile = '';
+            if isfield(data.dlc, 'filename'), dlcFile = data.dlc.filename; end
             source = 'dlc_module';  % follow later DLC edits (see onDLCChanged)
         end
         
@@ -133,6 +130,7 @@ function fig = gait_viewer(default_path)
         oldHd = data.gait.hd;
         data.gait = struct('hd', oldHd);
         data.gait.source = source;
+        data.gait.filename = dlcFile;   % shown in the title
         dlcPromptPending = false;
         for ii = 1:numel(hd.pawList.Items) 
             pawName = hd.pawList.Items{ii};
@@ -154,6 +152,15 @@ function fig = gait_viewer(default_path)
         plotTrace();
         getSteps();
         plotSteps();
+        updateTitle();
+    end
+
+    % The title shows the DLC file the paws were imported from.
+    function updateTitle()
+        fig.Name = 'Gait Viewer';
+        if data.has('gait') && isfield(data.gait, 'filename') && ~isempty(data.gait.filename)
+            fig.Name = ['Gait Viewer: ' data.gait.filename];
+        end
     end
 
     function getSpeeds()
@@ -346,6 +353,7 @@ function fig = gait_viewer(default_path)
         if ~isfield(hd, 'maskFig') || ~isgraphics(hd.maskFig, 'figure')
             % open a new window
             data.gait.hd.maskFig = GAIT.mask_GUI(mousePos);
+            notify(data, 'WindowsChanged');
         else
             % if window is already open, activate it.
             figure(hd.maskFig)
@@ -373,6 +381,7 @@ function fig = gait_viewer(default_path)
     end
 
     function updateInfo()
+        updateTitle();
         if data.has('gait')
             invalidateSteps();
             getSpeeds()
@@ -388,6 +397,7 @@ function fig = gait_viewer(default_path)
         if ~isfield(hd, 'sta_GUI') || ~isgraphics(hd.sta_GUI, 'figure')
             hd.sta_GUI = GAIT.sta_GUI(mousePos);
             data.gait.hd = hd;
+            notify(data, 'WindowsChanged');
         else
             figure(hd.sta_GUI);
         end
@@ -569,6 +579,7 @@ function fig = gait_viewer(default_path)
 
     % close function =================================
     function onClose(src,~)
+        if ~shared.confirm_close(fig, 'Gait Viewer'), return; end
         hd = data.gait.hd;
 
         % Clear data and graphic handles first
@@ -589,6 +600,7 @@ function fig = gait_viewer(default_path)
 
         notify(data, 'GaitChanged');   % other viewers remove their step markers
         delete(src);  % finally close the GUI
+        data.moduleClosed();
     end
 
 end 

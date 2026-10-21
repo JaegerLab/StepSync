@@ -9,6 +9,9 @@ classdef SessionData < handle
         frameRate double = 0;
         currentTime double = 0;
         currentZoom double = [0 10];
+
+        defaultPath char = '';      % start folder of file dialogs
+        closingAll logical = false; % true while all windows close: no prompts, no reset
     end
 
     events
@@ -20,6 +23,7 @@ classdef SessionData < handle
         GaitChanged         % gait results changed: steps, selection, visibility
         MaskChanged         % gait mask committed: gait recalculates steps
         MaskPreviewChanged  % gait mask preview: gait redraws trace colours only
+        WindowsChanged      % a module window or sub-window opened or closed
     end
 
     methods (Access = private)
@@ -93,6 +97,25 @@ classdef SessionData < handle
         function notifyDLC(obj, kind, bodyparts)
             if nargin < 3, bodyparts = {}; end
             notify(obj, 'DLCChanged', shared.DLCChangedData(kind, bodyparts));
+        end
+
+        % Remember the folder of a file or folder opened or saved in a module.
+        function rememberPath(obj, fileOrFolder)
+            folder = fileOrFolder;
+            if ~isfolder(folder), folder = fileparts(fileOrFolder); end
+            if ~isempty(folder) && isfolder(folder), obj.defaultPath = folder; end
+        end
+
+        % Called by a module window after it closed. Closing the last module
+        % window resets the session, unless all windows are being closed.
+        function moduleClosed(obj)
+            notify(obj, 'WindowsChanged');
+            if obj.closingAll, return; end
+            modules = fieldnames(obj.fig);
+            for k = 1:numel(modules)
+                if isgraphics(obj.fig.(modules{k}), 'figure'), return; end
+            end
+            delete(obj);
         end
 
         % check if data section is available

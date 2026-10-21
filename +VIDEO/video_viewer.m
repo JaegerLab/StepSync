@@ -1,45 +1,36 @@
-function fig = video_viewer(default_path)
+function fig = video_viewer()
 % App state
 
 data = shared.SessionData.instance();
 
-drawGUI(default_path);
+drawGUI();
 
 
-function drawGUI(default_path)
+function drawGUI()
     % Main UI figure with grid layout
     fig = uifigure('Name', 'Video Viewer', 'Position', [100 100 600 600], ...
         'CloseRequestFcn', @onClose);
     data.fig(1).video = fig;
+    shared.MenuBar(fig, {'Open', @openVideo; 'Save', []});
     % for dragging markers
     fig.WindowButtonDownFcn   = @(src,evt)onMouseDown(src, evt);
     fig.WindowButtonMotionFcn = @(src,evt)onMouseMove(src, evt);
     fig.WindowButtonUpFcn     = @(src,evt)onMouseUp(src, evt);
     drawnow
 
-    gl = uigridlayout(fig, [4, 2]);
-    gl.RowHeight = {30, 30, 40, '1x'};
+    gl = uigridlayout(fig, [3, 2]);
+    gl.RowHeight = {30, 40, '1x'};
     gl.ColumnWidth = {'1x', 100};
     gl.Padding = [10 10 10 10];
     gl.RowSpacing = 8;
     gl.ColumnSpacing = 8;
 
-    % Row 1: video path and open button
-    hPath = uieditfield(gl, 'text', 'Editable', 'off');
-    if nargin>=1
-        hPath.Value = default_path;
-    end
-    hPath.Layout.Row = 1; hPath.Layout.Column = 1;
-
-    uibutton(gl, 'Text', 'Open Video', 'ButtonPushedFcn', @openVideo, ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 2));
-
     hd = struct();
 
-    % Row 2: frame info
+    % Row 1: frame info
     subgrid1 = uigridlayout(gl, [1 3], 'Padding', [0 0 0 0]);
     subgrid1.ColumnWidth = {'1x', 130, 100, 90};
-    subgrid1.Layout.Row = 2; subgrid1.Layout.Column = 1;
+    subgrid1.Layout.Row = 1; subgrid1.Layout.Column = 1;
 
         % subgrid1
         hd.info = uilabel(subgrid1, ...
@@ -62,7 +53,7 @@ function drawGUI(default_path)
             'ValueChangedFcn', @manualFrameInput);
 
     subgrid2 = uigridlayout(gl, [1 2], 'Padding', [0 0 0 0]);
-    subgrid2.Layout.Row = 2; subgrid2.Layout.Column = 2;
+    subgrid2.Layout.Row = 1; subgrid2.Layout.Column = 2;
 
         hd.last = uibutton(subgrid2, 'Text', '<', ...
             'Tooltip','Ctrl+Click to change step size', ...
@@ -71,13 +62,15 @@ function drawGUI(default_path)
             'Tooltip','Ctrl+Click to change step size', ...
             'ButtonPushedFcn', @(src,evt)moveVideoFrame(1));
     
-    % Row 3: slider and play button
+    % Row 2: slider and play button
     hd.slider = uislider(gl, 'ValueChangedFcn', @sliderMoved);
+    hd.slider.Layout.Row = 2; hd.slider.Layout.Column = 1;
     hd.play = uibutton(gl, 'Text', 'Play', 'ButtonPushedFcn', @togglePlay);
+    hd.play.Layout.Row = 2; hd.play.Layout.Column = 2;
 
-    % Row 4: axes for video
+    % Row 3: axes for video
     ax = uiaxes(gl);
-    ax.Layout.Row = 4; ax.Layout.Column = [1 2];
+    ax.Layout.Row = 3; ax.Layout.Column = [1 2];
     ax.XTick = []; ax.YTick = [];
 
     % Timer for playback
@@ -85,7 +78,6 @@ function drawGUI(default_path)
         'Period', 0.02, ...
         'TimerFcn', @timerRunning);
 
-    hd.path = hPath;
     hd.ax = ax;
     axis(hd.ax, 'image'); axis(hd.ax, 'off');
     hold(hd.ax, "on");
@@ -98,34 +90,21 @@ function drawGUI(default_path)
     hd.gaitListener = addlistener(data, 'GaitChanged', @(~,~)redrawMarkers());
 
     data.video(1).hd = hd;
+    notify(data, 'WindowsChanged');
 end
 
 function openVideo(~,~)
     hd = data.video.hd;
-    filename = hd.path.Value;
-    if exist(filename, "file") ~= 2
-        if isempty(filename)
-            filename='*.mp4';
-        else
-            [pathname, file, ext] = fileparts(filename);
-            if isempty(ext)
-                % it's a path
-                filename = fullfile(pathname, file, '*.mp4');
-            else
-                % it's a filename
-                filename = fullfile(pathname, ['*' ext]);
-            end
-        end
-        [file, path] = uigetfile(filename, 'Open Video file');
-        drawnow; figure(fig);
-        if isequal(file, 0); return; end
-        filename = fullfile(path, file);
-        hd.path.Value = filename;
-    end
+    [file, path] = uigetfile(fullfile(data.defaultPath, '*.mp4'), 'Open Video file');
+    drawnow; figure(fig);
+    if isequal(file, 0); return; end
+    filename = fullfile(path, file);
+    data.rememberPath(filename);
     stop(hd.timer);
     data.video.vid = VideoReader(filename);
+    data.video.filename = filename;
     data.video.frameIdx = 1;
-    
+
     data.video.hd = hd;
 
     data.video.frameRate = data.getFrameRate();
@@ -135,6 +114,14 @@ function openVideo(~,~)
     updateVideoFrame(1);
     data.setTime(data.video.t(1));
     notify(data, 'InfoChanged');
+end
+
+% The title shows the source video.
+function updateTitle()
+    fig.Name = 'Video Viewer';
+    if data.has('video') && isfield(data.video, 'filename')
+        fig.Name = ['Video Viewer: ' data.video.filename];
+    end
 end
 
 %% main == event response callback function
@@ -212,6 +199,7 @@ function updateInfo()
         data.video.vid.Height, data.video.vid.Width, totalFrames);
 
     data.video.hd = hd;
+    updateTitle();
 end
 
 function updateFrameRate(value)
@@ -456,6 +444,7 @@ function onMouseMove(~, ~)
 end
 
 function onClose(~,~)
+    if ~shared.confirm_close(fig, 'Video Viewer'), return; end
     hd=data.video.hd;
     % Stop timer
     if isfield(hd, 'timer') && isvalid(hd.timer)
@@ -479,5 +468,6 @@ function onClose(~,~)
     % Clear saved figure handle
     data.fig = rmfield(data.fig, 'video');
     delete(fig);  % finally close the GUI
+    data.moduleClosed();
 end
 end

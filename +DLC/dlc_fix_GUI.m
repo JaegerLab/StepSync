@@ -6,7 +6,7 @@ function fig = dlc_fix_GUI(mousePos)
     %% draw GUI
     % grid 4x3
     mousePos(2)=mousePos(2)-120;
-    fig = uifigure('Name', 'DLC auto fix', 'Position', [mousePos 300 250], ...
+    fig = uifigure('Name', 'DLC auto fix', 'Position', shared.place_window([mousePos 300 250]), ...
         'CloseRequestFcn', @onClose);
     grid1 = uigridlayout(fig, [4 2], "RowHeight",{30,30,30,'1x'});
 
@@ -150,6 +150,7 @@ function fig = dlc_fix_GUI(mousePos)
         
         data.dlc.hd = rmfield(data.dlc.hd, 'fixGUI');
         delete(src)
+        notify(data, 'WindowsChanged');
     end
 
 end

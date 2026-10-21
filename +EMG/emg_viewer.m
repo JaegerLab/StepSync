@@ -1,29 +1,25 @@
-function fig = emg_viewer(default_path)
+function fig = emg_viewer()
     % App state
     data = shared.SessionData.instance();
-    
-    drawGUI(default_path);
 
-    function drawGUI(default_path)
+    drawGUI();
+
+    function drawGUI()
         % EMG viewer window with uigridlayout
         fig = uifigure('Name', 'EMG Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn', @onClose);
         data.fig(1).emg = fig;
+        shared.MenuBar(fig, {'Open', @openEMG; 'Open .mat', []; 'Save', []});
         drawnow
         grid1 = uigridlayout(fig, ...
-            'RowHeight', {30, 30, '1x', 30}, ...
+            'RowHeight', {30, '1x', 30}, ...
             'ColumnWidth',{'1x', 140});
-        
-        
-        %% Row 1: Folder and open button
-        hd.path = uieditfield(grid1, 'text'); 
-        if nargin>=1
-            hd.path.Value = default_path;
-        end
-        uibutton(grid1, 'Text', 'Open EMG', 'ButtonPushedFcn', @openEMG);
-    
-        %% Row 2: Preprocess group
+
+        hd = struct();
+
+        %% Row 1: Preprocess group
         subgrid1 = uigridlayout(grid1, [1 5], 'Padding', [0 0 0 0]);
+        subgrid1.Layout.Row = 1; subgrid1.Layout.Column = 1;
         subgrid1.ColumnWidth = {'1x', 120, 100, 100, 100};
             hd.info = uilabel(subgrid1, 'Text', 'Sample Rate (Hz):');
             uibutton(subgrid1, 'Text', 'Push Frame Rate', 'ButtonPushedFcn', @pushFrameRate);
@@ -32,20 +28,21 @@ function fig = emg_viewer(default_path)
             uibutton(subgrid1, 'Text', 'Pre-Process', 'ButtonPushedFcn', @preprocess);
             hd.datatype = uidropdown(subgrid1, "Items", "Raw", "ValueChangedFcn", @typeChanged);
 
-        uibutton(grid1, 'Text', 'Load Channel Map', 'ButtonPushedFcn', @(src,evt)loadChannelMap()); 
-    
-        %% Row 3: Listbox + Axes
+        uibutton(grid1, 'Text', 'Load Channel Map', 'ButtonPushedFcn', @(src,evt)loadChannelMap(), ...
+            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 2));
+
+        %% Row 2: Listbox + Axes
         hd.ax = uiaxes(grid1);
-        hold(hd.ax, "on"); 
+        hold(hd.ax, "on");
         hd.ax.ButtonDownFcn = @axClicked;
-        hd.ax.Layout.Row = [3 4]; hd.ax.Layout.Column = 1;
+        hd.ax.Layout.Row = [2 3]; hd.ax.Layout.Column = 1;
         hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
         xlabel(hd.ax, 'Time (s)'); ylabel(hd.ax, 'Voltage');
         disableDefaultInteractivity(hd.ax)
     
         subgrid3 = uigridlayout(grid1, [2 1], Padding=[0 0 0 0], ...
             RowHeight={'1x', 30});
-        subgrid3.Layout.Row = 3; subgrid3.Layout.Column = 2;
+        subgrid3.Layout.Row = 2; subgrid3.Layout.Column = 2;
             hd.chanList = uilistbox(subgrid3, 'Multiselect', 'off', ...
                 'ValueChangedFcn', @(src,evt)updatePlots());
             subgrid4 = uigridlayout(subgrid3, [1 2], Padding = [0 0 0 0], ...
@@ -55,8 +52,9 @@ function fig = emg_viewer(default_path)
                 "Items",["Channel", "Muscle"], 'ValueChangedFcn', @(src,evt)sortChannelMap());
         
 
-        %% Row 4: zoom in, zoom out, update buttons
+        %% Row 3: zoom in, zoom out, update buttons
         subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
+        subgrid2.Layout.Row = 3; subgrid2.Layout.Column = 2;
         uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn, ...
             'Tooltip','Zoom in');
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
@@ -74,6 +72,7 @@ function fig = emg_viewer(default_path)
         hd.InfoListener = addlistener(data, 'InfoChanged', @(src, evt)updateInfo());
 
         data.emg(1).hd = hd;
+        notify(data, 'WindowsChanged');
     end
 
     %% === Load EMG the first time === %%
@@ -81,9 +80,10 @@ function fig = emg_viewer(default_path)
         hd = data.emg.hd;
         % open file----------------
         % == new UI, select the folder, compatible with Open Ephys ===
-        pathname = uigetdir(hd.path.Value, 'Select the Directory for EMG data files');
+        pathname = uigetdir(data.defaultPath, 'Select the Directory for EMG data files');
         drawnow; figure(fig);
         if isequal(pathname, 0), return; end
+        data.rememberPath(pathname);
 
         try
             emgData = EMG.emg_read(pathname);
@@ -165,7 +165,7 @@ function fig = emg_viewer(default_path)
         end
 
         % Update UI -------------------
-        hd.path.Value = data.emg.display_name;
+        fig.Name = ['EMG Viewer: ' data.emg.display_name];
         if isfield(data.emg,'analog_units'), ylabel(hd.ax,['EMG (' data.emg.analog_units ')']); end
         selectedChannel = hd.chanList.Value;
         if isfield(data.emg, 'ch_mapping')
@@ -263,21 +263,15 @@ function fig = emg_viewer(default_path)
     end
 
     function loadChannelMap()
-        % get default fileter
         hd = data.emg.hd;
-        default_file = hd.path.Value;
-        if isempty(default_file)
-            default_file='*.csv';
-        else
-            path = fileparts(default_file);
-            default_file = fullfile(path, '*.csv');
-        end
         % select file
-        [file, path] = uigetfile(default_file, 'Select Channel Mapping File', 'MultiSelect', 'off');
+        [file, path] = uigetfile(fullfile(data.defaultPath, '*.csv'), ...
+            'Select Channel Mapping File', 'MultiSelect', 'off');
         if isequal(path,0), return; end
         drawnow; figure(fig);
         filename = fullfile(path, file);
         if ~exist(filename, "file"), return; end
+        data.rememberPath(filename);
         
         % read channel mapping csv file
         ch_mapping = readtable(filename);
@@ -328,6 +322,7 @@ function fig = emg_viewer(default_path)
         if ~isfield(hd, 'prepGUI') || ~isgraphics(hd.prepGUI, 'figure')
             hd.prepGUI = EMG.emg_prep_GUI(mousePos);
             data.emg.hd = hd;
+            notify(data, 'WindowsChanged');
         else
             % if window is already open, don't open another one.
             figure(hd.prepGUI)
@@ -395,6 +390,7 @@ function fig = emg_viewer(default_path)
 
     % close function
     function onClose(~,~)
+        if ~shared.confirm_close(fig, 'EMG Viewer'), return; end
         hd = data.emg.hd;
         % Clear all the handles and plots;
         field = fields(hd);
@@ -413,6 +409,7 @@ function fig = emg_viewer(default_path)
         % Clear saved figure handle
         data.fig = rmfield(data.fig, 'emg');
         delete(fig);  % finally close the GUI
+        data.moduleClosed();
     end
 
 end

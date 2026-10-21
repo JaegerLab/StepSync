@@ -4,13 +4,23 @@ Use MATLAB with Signal Processing Toolbox, with the repository root on the path.
 
 ```matlab
 addpath(pwd)
-results = runtests('tests/test_analysis.m');
+results = runtests('tests');
 assertSuccess(results)
+```
+
+From a shell, change folder inside MATLAB: a `startup.m` that changes the
+folder overrides `-sd`, and `runtests('tests')` then finds no tests and still
+succeeds.
+
+```
+matlab -batch "cd('<repository root>'); addpath(pwd); results = runtests('tests'); assertSuccess(results)"
 ```
 
 The numerical tests cover event boundaries and masks, independent thresholds,
 STA time origins, duplicates and missing samples, recording boundaries and
-random controls, smoothing limits, and sparse SLEAP frames.
+random controls, smoothing limits, and sparse SLEAP frames. `test_windows`
+covers sub-window placement on multiple monitors, the session reset after the
+last module window closes, and the remembered dialog folder.
 
 Close StepSync before running the desktop integration test:
 
@@ -21,7 +31,26 @@ assertSuccess(results)
 
 This checks paw/trace switching, the mask editor without per-paw `.trace`,
 preview versus commit, threshold persistence, all-false masks and invalidation
-after a failed calculation. It is skipped without a desktop MATLAB session.
+after a failed calculation, and the menu bar: launcher closing, Window menu
+checkmarks and sub-windows, and Exit all resetting the session. The viewers
+are closed with `shared.exit_all(false)`, which skips the close confirmations.
+It is skipped without a desktop MATLAB session.
+
+Manual checks of the menu bar and windows:
+
+- The launcher closes when a module opens from a button, the Window menu or
+  Load session; running `StepSync` while modules are open raises them instead.
+- Window menu: checkmarks follow open modules; open sub-windows are listed,
+  indented, under their module and disappear when closed; Bring All to Front
+  leaves the invoking window on top.
+- Close and the window's X ask before closing a module window; sub-windows
+  close without asking; Exit all asks once.
+- After Exit all, or after closing the last module window, a new `StepSync`
+  has no leftover frame rate, time, zoom or path.
+- Sub-windows opened near a screen edge or on a second monitor are fully
+  visible, title bar (and the STA menu bar) included.
+- Titles show the opened file, also after Load session; file dialogs start in
+  the folder of the last file opened.
 
 Manual checks with representative recordings are still required:
 

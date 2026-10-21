@@ -2,6 +2,8 @@ function fig = video_viewer()
 % App state
 
 data = shared.SessionData.instance();
+% video export in progress (see saveVideo); not in hd, which holds handles only
+exportState = struct('running', false, 'abort', false, 'writer', []);
 
 drawGUI();
 
@@ -11,7 +13,7 @@ function drawGUI()
     fig = uifigure('Name', 'Video Viewer', 'Position', [100 100 600 600], ...
         'CloseRequestFcn', @onClose);
     data.fig(1).video = fig;
-    shared.MenuBar(fig, {'Open', @openVideo; 'Save', []});
+    shared.MenuBar(fig, {'Open', @openVideo; 'Save', @saveVideo});
     % for dragging markers
     fig.WindowButtonDownFcn   = @(src,evt)onMouseDown(src, evt);
     fig.WindowButtonMotionFcn = @(src,evt)onMouseMove(src, evt);
@@ -94,6 +96,7 @@ function drawGUI()
 end
 
 function openVideo(~,~)
+    if exportState.running, return; end
     hd = data.video.hd;
     [file, path] = uigetfile(fullfile(data.defaultPath, '*.mp4'), 'Open Video file');
     drawnow; figure(fig);
@@ -114,6 +117,122 @@ function openVideo(~,~)
     updateVideoFrame(1);
     data.setTime(data.video.t(1));
     notify(data, 'InfoChanged');
+end
+
+%% === Save: export the video with the markers drawn in ===
+% Frames are read in order at native resolution, markers are drawn into the
+% pixels (VIDEO.draw_markers) from one snapshot of markerState(), and
+% VideoWriter writes MPEG-4 at the session frame rate.
+function saveVideo(~,~)
+    if exportState.running, return; end
+    if ~data.has('video')
+        uialert(fig, 'There is no video to save.', 'Save');
+        return;
+    end
+    [range, ok] = shared.ask_save_range(fig, 'Video');
+    if ~ok, return; end
+    % frames with a time only (none past the last trigger)
+    t = data.video.t(:);
+    inside = isfinite(t);
+    if ~isempty(range), inside = inside & t >= range(1) & t <= range(2); end
+    if ~any(inside)
+        uialert(fig, 'No video frames lie in the zoom window.', 'Save');
+        return;
+    end
+    frames = (find(inside, 1):find(inside, 1, 'last'))';
+
+    source = data.video.filename;
+    [~, base] = fileparts(source);
+    [file, path] = uiputfile('*.mp4', 'Save video', fullfile(data.defaultPath, [base '_StepSync.mp4']));
+    drawnow; figure(fig);
+    if isequal(file, 0), return; end
+    filename = fullfile(path, file);
+    if strcmpi(filename, source)
+        uialert(fig, 'That is the source video. Choose another name.', 'Save refused');
+        return;
+    end
+    answer = inputdlg('Quality (0 to 100):', 'Video quality', [1 30], {'80'});
+    drawnow; figure(fig);
+    if isempty(answer), return; end
+    quality = str2double(answer{1});
+    if ~isscalar(quality) || ~isfinite(quality) || quality < 0 || quality > 100
+        uialert(fig, 'The quality must be a number from 0 to 100.', 'Save');
+        return;
+    end
+
+    state = markerState();
+    if ~isempty(state.dlc), state.dlc.tempX = []; state.dlc.tempY = []; end   % committed only
+    writer = VideoWriter(filename, 'MPEG-4');
+    writer.FrameRate = data.getFrameRate();
+    writer.Quality = round(quality);
+    data.rememberPath(filename);
+
+    hd = data.video.hd;
+    beginExport(hd, writer);
+    finish = onCleanup(@()endExport(hd));
+    written = 0;
+    try
+        written = VIDEO.write_marked_video(writer, source, frames, data.video.t, state, ...
+            pointScale(hd), @(k, n, img)exportProgress(hd, frames, k, n, img));
+    catch ME
+        if isvalid(fig), uialert(fig, ME.message, 'Save failed'); end
+    end
+    if ~isvalid(fig), return; end   % closed during the export: the file is finalized
+    aborted = exportState.abort;
+    clear finish   % restores the window
+    if aborted
+        uialert(fig, sprintf('Aborted after %d of %d frames. The partial video is in %s.', ...
+            written, numel(frames), filename), 'Save', 'Icon', 'warning');
+    elseif written == numel(frames)
+        uialert(fig, sprintf('%d frames saved in %s.', written, filename), 'Save', 'Icon', 'success');
+    end
+end
+
+% Video pixels per screen point: markers look as in the window now.
+function s = pointScale(hd)
+    vid = data.video.vid;
+    pos = getpixelposition(hd.ax);
+    screenPerVideo = min(pos(3) / vid.Width, pos(4) / vid.Height);
+    s = (96/72) / screenPerVideo;   % 96 screen pixels per inch
+end
+
+% Only the abort button stays usable; listeners pause; live markers hide.
+function beginExport(hd, writer)
+    exportState = struct('running', true, 'abort', false, 'writer', writer);
+    stop(hd.timer);
+    set([hd.frameRate hd.time hd.frame hd.last hd.next hd.slider], 'Enable', 'off');
+    set([hd.timeListener hd.infoListener hd.dlcListener hd.gaitListener], 'Enabled', false);
+    for name = {'stepMarker', 'dlcMarker', 'dlcTempMarker'}
+        hideMarker(hd, name{1});
+    end
+    fig.Pointer = 'watch';
+    hd.play.Text = 'Abort (0%)';
+end
+
+function endExport(hd)
+    exportState.running = false;
+    exportState.writer = [];
+    if ~isvalid(fig), return; end
+    set([hd.frameRate hd.time hd.frame hd.last hd.next hd.slider], 'Enable', 'on');
+    set([hd.timeListener hd.infoListener hd.dlcListener hd.gaitListener], 'Enabled', true);
+    fig.Pointer = 'arrow';
+    hd.play.Text = 'Play';
+    onInfoChanged();   % resync: frame, slider and markers at the current time
+end
+
+% Progress in the abort button and the slider; a preview every 10 frames.
+function ok = exportProgress(hd, frames, k, n, img)
+    ok = false;
+    if exportState.abort || ~isvalid(fig), return; end
+    if mod(k, 5) == 0 || k == n
+        hd.play.Text = sprintf('Abort (%d%%)', floor(100 * k / n));
+        hd.slider.Value = frames(k);
+        if mod(k, 10) == 0 && isfield(hd, 'image') && isgraphics(hd.image)
+            hd.image.CData = img(1:min(end, size(hd.image.CData, 1)), 1:min(end, size(hd.image.CData, 2)), :);
+        end
+        drawnow;   % keeps other windows and the abort button usable
+    end
+    ok = ~exportState.abort && isvalid(fig);
 end
 
 % The title shows the source video.
@@ -243,6 +362,7 @@ function manualFrameInput(~,~)
 end
 
 function togglePlay(~,~)
+    if exportState.running, exportState.abort = true; return; end   % the button reads "Abort"
     if ~data.has('video'), return; end
     hd = data.video.hd;
     if strcmp(hd.play.Text, 'Play')
@@ -357,7 +477,8 @@ end
 
 % drag the markers ==========================
 function onMouseDown(~, ~)
-    if data.has('dlc') 
+    if exportState.running, return; end
+    if data.has('dlc')
         hd = data.video.hd;
         % begin dragging
         cp = hd.ax.CurrentPoint;   % [x y] in axes data units
@@ -388,6 +509,7 @@ function onMouseDown(~, ~)
 end
 
 function onMouseUp(~, ~)
+    if exportState.running, return; end
     hd = data.video.hd;
     % update xy data and finish dragging
     if isfield(data.video, 'drag')
@@ -410,6 +532,7 @@ function onMouseUp(~, ~)
 end
 
 function onMouseMove(~, ~)
+    if exportState.running, return; end
     hd = data.video.hd;
     cp = hd.ax.CurrentPoint;
     cx = cp(1,1);  cy = cp(1,2);
@@ -445,6 +568,12 @@ end
 
 function onClose(~,~)
     if ~shared.confirm_close(fig, 'Video Viewer'), return; end
+    % During an export: finalize the file now. The export loop resumes only
+    % after this returns, possibly after Exit all deleted the session.
+    if exportState.running
+        exportState.abort = true;
+        if ~isempty(exportState.writer), close(exportState.writer); end
+    end
     hd=data.video.hd;
     % Stop timer
     if isfield(hd, 'timer') && isvalid(hd.timer)

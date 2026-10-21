@@ -31,7 +31,10 @@ achieved sample rate after down sampling. `test_files` covers DLC csv frame
 numbers (a zoom-window save keeps the original frame numbers; on open a
 cropped file is shifted to 1 when the video has the same number of frames,
 otherwise padded with NaN) and the gait `.mat` file (round trip, zoom window
-as NaN plus mask, rejected files).
+as NaN plus mask, rejected files). `test_video` covers the marker rasterizer
+(positions, ring alpha by time, scale, grayscale, missing points) and the
+export (padding to even size, frame count and rate, abort and a writer
+closed from outside both leave a playable file).
 
 Close StepSync before running the desktop integration test:
 
@@ -114,6 +117,17 @@ Manual checks of DLC and Gait files:
 - Gait Open with a different frame rate warns. A gait file imported from the
   DLC viewer follows DLC edits after Open only if the DLC viewer has the
   same file open.
+
+Manual checks of the video export (File > Save in the video window):
+
+- Full length and zoom window; quality prompt defaults to 80. Markers in the
+  file match the window: cyan + at the DLC point (no fix preview), magenta
+  step circles fading with time, same size as on screen.
+- During the export Play reads Abort (n%), the slider shows progress, the
+  image updates, marker dragging and other controls are off, and other
+  windows stay usable. Afterwards the window is back at the current time.
+- Abort, closing the video window, and Exit all during the export each leave
+  a playable partial file; the source video cannot be chosen as output.
 - Preview a pose correction, switch body part/settings and Save As; check source identity.
 
 Validation performed in the editing environment: MISS_HIT parsed all 38 MATLAB

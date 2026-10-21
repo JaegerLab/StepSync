@@ -18,7 +18,7 @@ matlab -batch "cd('<repository root>'); addpath(pwd); results = runtests('tests'
 
 The numerical tests cover event boundaries and masks, independent thresholds,
 STA time origins, duplicates and missing samples, recording boundaries and
-random controls, smoothing limits, and sparse SLEAP frames. `test_windows`
+random controls and smoothing limits. `test_windows`
 covers sub-window placement on multiple monitors, the session reset after the
 last module window closes, and the remembered dialog folder. `test_sessions`
 writes session files and reads them back (selected modules only, format
@@ -76,7 +76,7 @@ Manual checks with representative recordings are still required:
 - Load single and consecutive RHD/RHS files; verify sample/channel counts and TTL rate.
 - Switch to a recording without camera TTL; verify old triggers/processed data are gone.
 - Load Open Ephys and explicitly select the camera TTL line when several exist.
-- Load DLC CSV/HDF5/MAT and SLEAP files; inspect markers at known frames.
+- Load DLC CSV/HDF5/MAT files (also SLEAP's DeepLabCut-format csv export); inspect markers at known frames.
 - Use a video whose encoded rate differs from acquisition rate; check first, consecutive,
   jumped-to and last frames, and playback speed.
 - Save a session with a rate override, selected paw/trace, thresholds, time and zoom;

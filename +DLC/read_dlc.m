@@ -40,13 +40,8 @@ function tabledlc = read_dlc(filename)
 switch lower(ext)
     % ########## to do: handle different type of data formats ###
     case '.csv'
-        if contains(filename, '.analysis')
-            % csv by SLEAP
-            tabledlc = DLC.read_slp(filename);
-        else
-            % csv by DeepLabCut
-            tabledlc = DLC.read_csv(filename);
-        end
+        % csv by DeepLabCut (SLEAP exports the same format)
+        tabledlc = DLC.read_csv(filename);
     case '.h5'
         tabledlc = DLC.read_h5(filename);
     case '.mat'

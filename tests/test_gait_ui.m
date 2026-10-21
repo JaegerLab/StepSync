@@ -167,3 +167,47 @@ verifyFalse(testCase,isgraphics(dlcFig) || isgraphics(gaitFig));
 verifyEmpty(testCase,findall(groot,'Type','figure','Name','Video Viewer'));
 verifyEqual(testCase,shared.SessionData.instance().frameRate,0);
 end
+
+function testSessionRestoreReplacesWindows(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+cleanup = onCleanup(@()shared.exit_all(false));
+file = [tempname '.mat'];
+removeFile = onCleanup(@()delete(file));
+S.frameRate = 20;
+gaitFig = GAIT.gait_viewer();
+dlcFig = DLC.dlc_viewer();
+hd = S.gait.hd;
+hd.pawList.Items = {'a','b'}; hd.pawList.ItemsData = [1 2]; hd.pawList.Value = 2;
+hd.pawList.Enable = 'on';
+hd.stepList.Items = {'rising','falling','onset','offset','peak','valley'};
+hd.stepList.ItemsData = hd.stepList.Items;
+hd.stepList.Value = 'rising'; hd.stepList.Enable = 'on';
+hd.resolution.Value = 42;
+x = repmat([0;0;4;4;0;0],20,1);
+for k = 1:2
+    S.gait.paw(k).name = hd.pawList.Items{k};
+    S.gait.paw(k).raw_x = x+(k-1)*10;
+    S.gait.paw(k).raw_y = circshift(x,1)+(k-1)*20;
+    S.gait.paw(k).thresh = struct('x',NaN,'y',NaN,'speed',NaN);
+end
+notify(S,'InfoChanged');
+gaitFig.Position = [150 160 900 450];
+S.setTime(2); S.setZoom([1 3]);
+shared.write_session(file,{'gait'});   % DLC stays out of the session
+% change everything, then restore
+hd.resolution.Value = 10; hd.pawList.Value = 1;
+S.frameRate = 50; S.setTime(4);
+shared.restore_session(shared.read_session(file));
+verifyFalse(testCase,isgraphics(gaitFig) || isgraphics(dlcFig));   % all windows replaced
+verifyEqual(testCase,fieldnames(S.fig),{'gait'});
+verifyEqual(testCase,S.fig.gait.Position,[150 160 900 450]);
+verifyEqual(testCase,S.gait.hd.resolution.Value,42);
+verifyEqual(testCase,S.gait.hd.pawList.Value,2);
+verifyEqual(testCase,numel(S.gait.paw),2);
+verifyTrue(testCase,S.gait.stepsValid);
+verifyEqual(testCase,[S.frameRate S.currentTime],[20 2]);
+verifyEqual(testCase,S.currentZoom,[1 3]);
+verifyFalse(testCase,S.closingAll);
+end

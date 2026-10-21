@@ -81,23 +81,6 @@ verifyEqual(testCase,p,[0.95*ones(10,1);1;0.9;0.1;0.5;0;0.5],'AbsTol',1e-12);
 verifyEqual(testCase,p,DLC.seg_likelihood(seg));
 end
 
-function testLegacySessionMigrationPreservesFramesAndRules(testCase)
-saved = struct('frameRate',100,'currentTime',0.02,'currentZoom',[0 1]);
-saved.emg.trigger.time = (2:0.01:3)';
-rules = table(0.01,0.03,'VariableNames',{'FromTime','ToTime'});
-saved.gait.maskParam = struct('Rules',rules,'Speed',[1;2;NaN], ...
-    'SpeedTime',[0.01;0.02;0.03],'SpeedSource','DLC: paw');
-saved.gait.speedFactor = 5;
-actual = shared.migrate_session_time(saved);
-verifyEqual(testCase,actual.currentTime,2.01,'AbsTol',1e-12);
-verifyEqual(testCase,actual.gait.maskParam.Rules.FromTime,2,'AbsTol',1e-12);
-verifyEqual(testCase,actual.gait.maskParam.Rules.ToTime,2.02,'AbsTol',1e-12);
-verifyEqual(testCase,actual.gait.maskParam.Speed(1:2),[0.2;0.4],'AbsTol',1e-12);
-verifyEqual(testCase,actual.gait.maskParam.SpeedUnits,'pixels/frame');
-verifyEmpty(testCase,actual.gait.maskParam.SpeedTime);
-verifyEqual(testCase,shared.migrate_session_time(actual),actual);
-end
-
 function testDlcChangedDataNormalisesBodyparts(testCase)
 evt = shared.DLCChangedData('edit',"paw");
 verifyEqual(testCase,evt.Kind,'edit');

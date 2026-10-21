@@ -20,7 +20,10 @@ The numerical tests cover event boundaries and masks, independent thresholds,
 STA time origins, duplicates and missing samples, recording boundaries and
 random controls, smoothing limits, and sparse SLEAP frames. `test_windows`
 covers sub-window placement on multiple monitors, the session reset after the
-last module window closes, and the remembered dialog folder.
+last module window closes, and the remembered dialog folder. `test_sessions`
+writes session files and reads them back (selected modules only, format
+marker `fileFormat = 'StepSync session'`, `formatVersion = 3`) and checks that
+other files, older and newer formats are rejected.
 
 Close StepSync before running the desktop integration test:
 
@@ -32,7 +35,9 @@ assertSuccess(results)
 This checks paw/trace switching, the mask editor without per-paw `.trace`,
 preview versus commit, threshold persistence, all-false masks and invalidation
 after a failed calculation, and the menu bar: launcher closing, Window menu
-checkmarks and sub-windows, and Exit all resetting the session. The viewers
+checkmarks and sub-windows, and Exit all resetting the session; and that
+restoring a session replaces all module windows and brings back window
+positions, widget values, data, frame rate, time and zoom. The viewers
 are closed with `shared.exit_all(false)`, which skips the close confirmations.
 It is skipped without a desktop MATLAB session.
 
@@ -65,6 +70,10 @@ Manual checks with representative recordings are still required:
   jumped-to and last frames, and playback speed.
 - Save a session with a rate override, selected paw/trace, thresholds, time and zoom;
   reload over another session and after restarting; check all four viewers.
+- Save session lists the open modules, all selected; save only some and check
+  that loading reopens just those. With no module open it shows an alert.
+- Load session asks once when module windows are open, not from the launcher;
+  a non-session or old session file shows an alert and closes nothing.
 - Preview a pose correction, switch body part/settings and Save As; check source identity.
 
 Validation performed in the editing environment: MISS_HIT parsed all 38 MATLAB

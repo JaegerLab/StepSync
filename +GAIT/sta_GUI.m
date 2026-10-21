@@ -18,9 +18,11 @@ function fig = sta_GUI(mousePos)
     WIN_H = 480;
     mousePos(2) = mousePos(2) - WIN_H;   % open below cursor (same convention)
 
+    MENU_BAR = 22;
     fig = uifigure('Name', 'Step-Triggered Average', ...
-        'Position', [mousePos WIN_W WIN_H], ...
+        'Position', shared.place_window([mousePos WIN_W WIN_H], MENU_BAR), ...
         'CloseRequestFcn', @onClose);
+    shared.MenuBar(fig, {'Open', []; 'Save', []});
 
     % Root grid: 4 rows × 2 columns
     %   Col 1 (parameters) | Col 2 (Plot button, spans rows 1-2)
@@ -132,13 +134,9 @@ function fig = sta_GUI(mousePos)
         % EMG channel & type
         emgType = data.emg.hd.datatype.Value;
         channel = data.emg.hd.chanList.Value;
-        if strcmp(emgType, 'Raw')
-            emg  = data.emg.analog_data(:, channel);
-            emgT = data.emg.t;
-        else
-            emg  = data.emg.processed.data(:, channel);
-            emgT = data.emg.processed.t;
-        end
+        src  = EMG.emg_source(data.emg, emgType);
+        emg  = src.data(:, channel);
+        emgT = src.t;
 
         if ~GAIT.steps_current(data)
             uialert(fig, 'Steps are not current. Recalculate the selected paw first.', 'Error');
@@ -324,6 +322,7 @@ function fig = sta_GUI(mousePos)
             data.gait.hd = rmfield(data.gait.hd, 'sta_GUI');
         end
         delete(src);
+        notify(data, 'WindowsChanged');
     end
 
     %% ═══════════════════════════════════════════════════════════════════

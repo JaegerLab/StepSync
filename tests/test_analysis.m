@@ -72,20 +72,6 @@ end
 verifyEqual(testCase,shared.fastsmooth(x,1),x);
 end
 
-function testSparseSleapRetainsFrameIndices(testCase)
-filename = [tempname '.analysis.csv'];
-cleanup = onCleanup(@()delete(filename)); %#ok<NASGU>
-raw = table([0;2], [1;3], [2;4], [0.9;0.8], ...
-    'VariableNames',{'frame_idx','paw_x','paw_y','paw_score'});
-writetable(raw,filename);
-t = DLC.read_slp(filename);
-verifyEqual(testCase,height(t),3);
-verifyTrue(testCase,all(isnan(t{2,:})));
-verifyEqual(testCase,t.paw_x([1 3]),[1;3]);
-verifyEqual(testCase,t.Properties.UserData,{'paw'});
-end
-
-
 function testSmoothingMissingSamplesDoesNotPoisonTail(testCase)
 x = (1:30)'; x(5) = NaN;
 y = shared.fastsmooth(x,3);

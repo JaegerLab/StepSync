@@ -3,6 +3,16 @@ function data = read_ephys(files)
 % go to https://github.com/open-ephys/open-ephys-matlab-tools
 % for ephys reader installation and documentation.
 
+if ~exist('Session', 'class')
+    url = 'https://github.com/open-ephys/open-ephys-matlab-tools';
+    fprintf(['Reading Open Ephys data needs open-ephys-matlab-tools (class Session).\n' ...
+        'Install it from %s and add it to the MATLAB path.\n'], url);
+    msgbox(sprintf(['Reading Open Ephys data needs open-ephys-matlab-tools.\n\n' ...
+        'Install it from\n%s\nand add it to the MATLAB path.'], url), ...
+        'Open Ephys reader missing', 'warn', 'modal');
+    error('EMG:missingReader', 'open-ephys-matlab-tools is not on the MATLAB path.');
+end
+
 session = Session(files);
 data = struct();
 if isempty(session.recordNodes); return; end

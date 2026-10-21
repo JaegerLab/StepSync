@@ -6,7 +6,7 @@ function fig = dlc_fix_GUI(mousePos)
     %% draw GUI
     % grid 4x3
     mousePos(2)=mousePos(2)-120;
-    fig = uifigure('Name', 'DLC auto fix', 'Position', [mousePos 300 250], ...
+    fig = uifigure('Name', 'DLC auto fix', 'Position', shared.place_window([mousePos 300 250]), ...
         'CloseRequestFcn', @onClose);
     grid1 = uigridlayout(fig, [4 2], "RowHeight",{30,30,30,'1x'});
 
@@ -57,7 +57,7 @@ function fig = dlc_fix_GUI(mousePos)
         data.dlc.previewParameters = [jumpthresh.Value winwidth.Value];
         
         % plot comparison
-        notify(data, 'DataChanged');
+        data.notifyDLC('preview');
     end
 
     function saveAs()
@@ -104,7 +104,7 @@ function fig = dlc_fix_GUI(mousePos)
             data.dlc.table.Properties.UserData{end+1} = newName;
         end
         data.dlc.hd.list_bodyparts.Value = newName;
-        notify(data, 'DataChanged');
+        data.notifyDLC('commit', {newName});
     end
 
     function removeTempPlots()
@@ -117,12 +117,7 @@ function fig = dlc_fix_GUI(mousePos)
         data.dlc.hd = rmfield(data.dlc.hd, f);
         data.dlc.seg = [];
         data.dlc.seg_bodypart = '';
-
-        % remove temp marker drawn in video viewer
-        if data.has('video') && isfield(data.video.hd, 'dlcTempMarker')
-            delete(data.video.hd.dlcTempMarker)
-            data.video.hd = rmfield(data.video.hd, 'dlcTempMarker');
-        end
+        % the video viewer hides its preview marker on the next DLCChanged
     end
 
     function autoThresh(~,~)
@@ -150,11 +145,12 @@ function fig = dlc_fix_GUI(mousePos)
                 data.dlc.table = removevars(data.dlc.table, {'temp_x', 'temp_y', 'temp_likelihood'});
             end
             removeTempPlots();
-            notify(data, 'DataChanged');
+            data.notifyDLC('preview');
         end
         
         data.dlc.hd = rmfield(data.dlc.hd, 'fixGUI');
         delete(src)
+        notify(data, 'WindowsChanged');
     end
 
 end

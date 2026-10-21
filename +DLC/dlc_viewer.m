@@ -1,30 +1,25 @@
-function fig = dlc_viewer(default_path)
+function fig = dlc_viewer()
     data = shared.SessionData.instance();
 
-    drawGUI(default_path);
+    drawGUI();
 
-    function drawGUI(default_path)
+    function drawGUI()
         % DLC viewer window with uigridlayout
         fig = uifigure('Name', 'DLC Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn', @onClose);
         data.fig(1).dlc = fig;
+        shared.MenuBar(fig, {'Open', @openDLC; 'Save', @saveDLC});
         drawnow
-        grid1 = uigridlayout(fig, [4 2]);
+        grid1 = uigridlayout(fig, [3 2]);
         grid1.Padding = [20,20,20,20];
         grid1.ColumnWidth = {'1x', 140};
-        grid1.RowHeight = {30, 30, '1x', 30};
-        
+        grid1.RowHeight = {30, '1x', 30};
+
         hd = struct();
-        %% Row 1: Folder and open button
-        hd.path = uieditfield(grid1, 'text'); 
-        if nargin>=1
-            hd.path.Value = default_path;
-        end
-        uibutton(grid1, 'Text', 'Open DLC', 'ButtonPushedFcn', @openDLC);
-    
-        %% Row 2: DLC processing
+
+        %% Row 1: DLC processing
         subgrid1 = uigridlayout(grid1, [1 7], 'Padding', [0 0 0 0], ...
-            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 2, 'Column', 1));
+            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
         subgrid1.ColumnWidth = {'1x', 30, 30, 30, 100, 80, 100};
             hd.info = uilabel(subgrid1,'Text',' Info:', 'BackgroundColor','w');
             hd.chk_x = uicheckbox(subgrid1,'Text','X','Value',1, ...
@@ -42,14 +37,15 @@ function fig = dlc_viewer(default_path)
             
         % subgrid3 = uigridlayout(grid1, [1 2], 'Padding', [0 0 0 0]);
         % subgrid3.Layout.Row = 2; subgrid3.Layout.Column = 2;
-        uibutton(grid1,'Text','DLC Fix', 'ButtonPushedFcn',@openFix);
+        uibutton(grid1,'Text','DLC Fix', 'ButtonPushedFcn',@openFix, ...
+            'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 2));
             % hd.manualFix = uicheckbox(subgrid3,'Text','Man. Fix','Value', 0, ...
             %     'ValueChangedFcn',@manualFix);
-        
-    
-        %% Row 3: DLC plot
-        hd.ax = uiaxes(grid1); 
-        hd.ax.Layout.Row = [3 4]; hd.ax.Layout.Column = 1;
+
+
+        %% Row 2: DLC plot
+        hd.ax = uiaxes(grid1);
+        hd.ax.Layout.Row = [2 3]; hd.ax.Layout.Column = 1;
         hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
         axis(hd.ax, 'ij'); 
         xlabel(hd.ax, 'Frame'); ylabel(hd.ax, 'Location (pixel)');
@@ -60,10 +56,11 @@ function fig = dlc_viewer(default_path)
 
         hd.list_bodyparts = uilistbox(grid1, 'Multiselect', 'off', ...
             'Enable','off', 'ValueChangedFcn', @(src,evt)listChanged());
-        hd.list_bodyparts.Layout.Row = 3; hd.list_bodyparts.Layout.Column = 2;
-    
-        %% Row 4:  zoom in, zoom out, update buttons        
+        hd.list_bodyparts.Layout.Row = 2; hd.list_bodyparts.Layout.Column = 2;
+
+        %% Row 3:  zoom in, zoom out, update buttons
         subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
+        subgrid2.Layout.Row = 3; subgrid2.Layout.Column = 2;
         uibutton(subgrid2,'Text','🔍︎+','ButtonPushedFcn',@zoomIn, ...
             'Tooltip','Zoom in');
         uibutton(subgrid2,'Text','🔍︎-','ButtonPushedFcn',@zoomOut, ...
@@ -76,36 +73,28 @@ function fig = dlc_viewer(default_path)
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateDLCtime(src.currentTime));
         hd.zoomListener = addlistener(data, 'ZoomChanged', @(src, evt)updateDLCzoom(src.currentZoom));
-        hd.dataListener = addlistener(data, 'DataChanged', @(src, evt)showBodypart());
+        hd.dlcListener = addlistener(data, 'DLCChanged', @(src, evt)showBodypart());
+        hd.gaitListener = addlistener(data, 'GaitChanged', @(src, evt)drawSteps());
         hd.infoListener = addlistener(data, 'InfoChanged', @(src, evt)updateInfo());
 
         data.dlc(1).hd = hd;
+        notify(data, 'WindowsChanged');
     end
 
     function openDLC(~,~)
         hd = data.dlc.hd;
-        filename = hd.path.Value;
-        if isempty(filename)
-            filename='*.csv';
-        else
-            [pathname, file, ext] = fileparts(filename);
-            if isempty(ext)
-                filename = fullfile(pathname, file, '*.csv');
-            else
-                filename = fullfile(pathname, ['*' ext]);
-            end
-        end
-        [filename, pathname]=uigetfile(filename, 'Open DeepLabCut file');
+        [filename, pathname]=uigetfile(fullfile(data.defaultPath, '*.csv'), 'Open DeepLabCut file');
         drawnow; figure(fig);
         if isequal(pathname,0), return; end
         filename=fullfile(pathname, filename);
         if ~exist(filename, "file"), return; end
+        data.rememberPath(filename);
 
-        hd.path.Value = filename;
-    
         % This reading function handles different kinds of data formats
-        tabledlc = DLC.read_dlc(filename);
+        tabledlc = DLC.align_to_video(DLC.read_dlc(filename), fig);
         data.dlc.table = tabledlc;
+        data.dlc.filename = filename;      % shown in the title; the last saved file
+        data.dlc.source_file = filename;   % Save may not overwrite it
         data.dlc.seg = [];
         data.dlc.seg_bodypart = '';
 
@@ -121,14 +110,50 @@ function fig = dlc_viewer(default_path)
 
         % update frame rate and total frames
         notify(data, 'InfoChanged')
-        % draw trajectory plot
-        notify(data, 'DataChanged');
-        % draw time line
+        % draw time line first: it stays below the traces, so clicks reach them
         updateDLCtime(data.currentTime);
+        % draw trajectory plot
+        data.notifyDLC('open', tabledlc.Properties.UserData);
+    end
+
+    % Save committed body parts as a DLC csv; uncommitted fix previews
+    % (temp_*) are left out by DLC.save_csv.
+    function saveDLC(~,~)
+        if ~data.has('dlc')
+            uialert(fig, 'There is no DLC data to save.', 'Save');
+            return;
+        end
+        [range, ok] = shared.ask_save_range(fig, 'DLC');
+        if ~ok, return; end
+        original = data.dlc.filename;
+        if isfield(data.dlc, 'source_file'), original = data.dlc.source_file; end
+        [folder, base] = fileparts(original);
+        if ~isempty(data.defaultPath), folder = data.defaultPath; end
+        [file, path] = uiputfile('*.csv', 'Save DLC', fullfile(folder, [base '_StepSync.csv']));
+        drawnow; figure(fig);
+        if isequal(file, 0), return; end
+        filename = fullfile(path, file);
+        if strcmpi(filename, original)
+            uialert(fig, sprintf('%s is the file this DLC data was opened from. Choose another name.', file), ...
+                'Save refused');
+            return;
+        end
+        tabledlc = data.dlc.table;
+        if ~isempty(range)
+            tabledlc = DLC.crop_table(tabledlc, data.dlc.t, range);
+            if height(tabledlc) == 0
+                uialert(fig, 'No frames lie in the zoom window.', 'Save');
+                return;
+            end
+        end
+        DLC.save_csv(filename, tabledlc);
+        data.rememberPath(filename);
+        data.dlc.filename = filename;   % the title shows the saved file
+        fig.Name = ['DLC Viewer: ' filename];
     end
 
     function listChanged()
-        notify(data,'DataChanged');
+        data.notifyDLC('selection');
     end
 
     % main update function.=========================
@@ -161,6 +186,12 @@ function fig = dlc_viewer(default_path)
 
         % plot xy plots
         hold(hd.ax, "on");
+        % The time line must exist before the traces are created: plot order
+        % keeps it below them (no uistack: it fails with yyaxis). Session
+        % load draws the traces before TimeChanged, so create it here.
+        if ~isfield(hd, 'timeline_dlc') || ~ishghandle(hd.timeline_dlc)
+            hd = drawTimeline(hd);
+        end
         hd = shared.myPlot(@plot, hd, 'xplot', hd.ax, t, xdata, ...
                 '-', 'Color', S.xColor, 'LineWidth', S.trace, ...
                 'HitTest', 'on', 'ButtonDownFcn', @axClicked, 'DisplayName', S.legend.x, ...
@@ -211,6 +242,30 @@ function fig = dlc_viewer(default_path)
         end
         data.dlc.hd = hd;
         updateLegend(hd);
+        drawSteps();
+    end
+
+    % gait steps on the X and Y traces (left axis), following the X/Y checkboxes
+    function drawSteps()
+        if ~isfield(data.dlc, 'hd'), return; end
+        hd = data.dlc.hd;
+        steps = GAIT.current_steps(data);
+        if data.has('dlc') && ~isempty(steps) && ~isempty(steps.t)
+            if numel(hd.ax.YAxis) > 1, yyaxis(hd.ax, 'left'); end
+            spec = {'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, ...
+                'HitTest', 'off', 'HandleVisibility', 'off'};
+            hd = shared.myPlot(@scatter, hd, 'stepX', hd.ax, steps.t, steps.x, spec{:});
+            hd = shared.myPlot(@scatter, hd, 'stepY', hd.ax, steps.t, steps.y, spec{:});
+            hd.stepX.Visible = hd.chk_x.Value;
+            hd.stepY.Visible = hd.chk_y.Value;
+        else
+            for field = {'stepX', 'stepY'}
+                if isfield(hd, field{1}) && isgraphics(hd.(field{1}))
+                    hd.(field{1}).Visible = 'off';
+                end
+            end
+        end
+        data.dlc.hd = hd;
     end
 
     % One legend entry per item. Fix layers exist twice (x and y copies with
@@ -345,11 +400,7 @@ function fig = dlc_viewer(default_path)
         hd = setFixVisible(hd, '_x', src.Value && has_fix);
         data.dlc.hd = hd;
         updateLegend(hd);
-        if data.has('gait')
-            if isfield(data.gait.hd, 'stepXDLC') && ishghandle(data.gait.hd.stepXDLC)
-                data.gait.hd.stepXDLC.Visible = src.Value && data.gait.hd.stepCheck.Value;
-            end
-        end
+        drawSteps();
     end
     function checkYChanged(src,~)
         hd = data.dlc.hd;
@@ -360,11 +411,7 @@ function fig = dlc_viewer(default_path)
         hd = setFixVisible(hd, '_y', src.Value && has_fix);
         data.dlc.hd = hd;
         updateLegend(hd);
-        if data.has('gait')
-            if isfield(data.gait.hd, 'stepYDLC') && ishghandle(data.gait.hd.stepYDLC)
-                data.gait.hd.stepYDLC.Visible = src.Value && data.gait.hd.stepCheck.Value;
-            end
-        end
+        drawSteps();
     end
 
     function checkPChanged(src,~)
@@ -413,6 +460,9 @@ function fig = dlc_viewer(default_path)
     function updateInfo()
         if ~data.has('dlc'), return; end
         hd = data.dlc.hd;
+        if isfield(data.dlc, 'filename')
+            fig.Name = ['DLC Viewer: ' data.dlc.filename];
+        end
 
         % collect info
         frameRate = data.getFrameRate();
@@ -433,11 +483,12 @@ function fig = dlc_viewer(default_path)
         if ~isfield(hd, 'fixGUI') || ~isgraphics(hd.fixGUI, 'figure')
             % open a new window
             hd.fixGUI = DLC.dlc_fix_GUI(mousePos);
+            data.dlc.hd = hd;
+            notify(data, 'WindowsChanged');
         else
             % if window is already open, activate it.
             figure(hd.fixGUI)
         end
-        data.dlc.hd = hd;
     end
 
     % === sync time and zoom ===========
@@ -490,7 +541,7 @@ function fig = dlc_viewer(default_path)
         data.dlc.table.temp_y = tempY;
         data.dlc.table.temp_likelihood = DLC.seg_likelihood(seg);
         data.dlc.seg = seg;
-        notify(data, 'DataChanged');
+        data.notifyDLC('preview');
     end
 
     % frame at such that the clicked jump lies between frames a and a+1
@@ -525,11 +576,7 @@ function fig = dlc_viewer(default_path)
                 length(xdata), max(data.dlc.t, [], 'omitnan'), ...
                 xdata(f), ydata(f), pdata(f));
 
-            % draw time line on the left side (see drawP)
-            if numel(hd.ax.YAxis) > 1, yyaxis(hd.ax, 'left'); end
-            hd = shared.myPlot(@xline, hd, 'timeline_dlc', hd.ax, ...
-                data.currentTime,  'k', ...
-                'HitTest', 'off', 'HandleVisibility', 'off');
+            hd = drawTimeline(hd);
             data.dlc.hd = hd;
 
             data.setTime(currentTime);
@@ -538,6 +585,14 @@ function fig = dlc_viewer(default_path)
             zoomlim = shared.zoom(get(hd.ax,'xLim'), currentTime, 'pan');
             data.setZoom(zoomlim);
         end
+    end
+
+    % time line on the left side (see drawP)
+    function hd = drawTimeline(hd)
+        if numel(hd.ax.YAxis) > 1, yyaxis(hd.ax, 'left'); end
+        hd = shared.myPlot(@xline, hd, 'timeline_dlc', hd.ax, ...
+            data.currentTime,  'k', ...
+            'HitTest', 'off', 'HandleVisibility', 'off');
     end
 
     function zoomIn(~, ~)
@@ -570,6 +625,7 @@ function fig = dlc_viewer(default_path)
         if ~data.has('dlc'), return; end
         finiteTime = data.dlc.t(isfinite(data.dlc.t));
         if numel(finiteTime)>1, data.setZoom(finiteTime([1 end])); end
+        ylim(data.dlc.hd.ax, 'auto');   % also undo vertical zoom
 
         updateInfo();
     end
@@ -584,21 +640,11 @@ function fig = dlc_viewer(default_path)
 
     % close function =================================
     function onClose(src,~)
+        if ~shared.confirm_close(fig, 'DLC Viewer'), return; end
         hd=data.dlc.hd;
         % close fix GUI first.
         if isfield(hd, 'fixGUI') && isgraphics(hd.fixGUI)
             close(hd.fixGUI)
-        end
-        % Clear DLC markers on video
-        if data.has('video')
-            if isfield(data.video.hd, 'dlcMarker')
-                delete(data.video.hd.dlcMarker)
-                data.video.hd = rmfield(data.video.hd, 'dlcMarker');
-            end
-            if isfield(data.video.hd, 'dlcTempMarker')
-                delete(data.video.hd.dlcTempMarker)
-                data.video.hd = rmfield(data.video.hd, 'dlcTempMarker');
-            end
         end
         % Clear all the handles and plots;
         field = fields(hd);
@@ -616,7 +662,9 @@ function fig = dlc_viewer(default_path)
         data.dlc = struct();
         % Clear saved figure handle
         data.fig = rmfield(data.fig, 'dlc');
+        data.notifyDLC('close');   % e.g. the video viewer hides its DLC markers
         delete(src);  % finally close the GUI
+        data.moduleClosed();
     end
 end
 

@@ -1,45 +1,38 @@
-function fig = video_viewer(default_path)
+function fig = video_viewer()
 % App state
 
 data = shared.SessionData.instance();
+% video export in progress (see saveVideo); not in hd, which holds handles only
+exportState = struct('running', false, 'abort', false, 'writer', []);
 
-drawGUI(default_path);
+drawGUI();
 
 
-function drawGUI(default_path)
+function drawGUI()
     % Main UI figure with grid layout
     fig = uifigure('Name', 'Video Viewer', 'Position', [100 100 600 600], ...
         'CloseRequestFcn', @onClose);
     data.fig(1).video = fig;
+    shared.MenuBar(fig, {'Open', @openVideo; 'Save', @saveVideo});
     % for dragging markers
     fig.WindowButtonDownFcn   = @(src,evt)onMouseDown(src, evt);
     fig.WindowButtonMotionFcn = @(src,evt)onMouseMove(src, evt);
     fig.WindowButtonUpFcn     = @(src,evt)onMouseUp(src, evt);
     drawnow
 
-    gl = uigridlayout(fig, [4, 2]);
-    gl.RowHeight = {30, 30, 40, '1x'};
+    gl = uigridlayout(fig, [3, 2]);
+    gl.RowHeight = {30, 40, '1x'};
     gl.ColumnWidth = {'1x', 100};
     gl.Padding = [10 10 10 10];
     gl.RowSpacing = 8;
     gl.ColumnSpacing = 8;
 
-    % Row 1: video path and open button
-    hPath = uieditfield(gl, 'text', 'Editable', 'off');
-    if nargin>=1
-        hPath.Value = default_path;
-    end
-    hPath.Layout.Row = 1; hPath.Layout.Column = 1;
-
-    uibutton(gl, 'Text', 'Open Video', 'ButtonPushedFcn', @openVideo, ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 2));
-
     hd = struct();
 
-    % Row 2: frame info
+    % Row 1: frame info
     subgrid1 = uigridlayout(gl, [1 3], 'Padding', [0 0 0 0]);
     subgrid1.ColumnWidth = {'1x', 130, 100, 90};
-    subgrid1.Layout.Row = 2; subgrid1.Layout.Column = 1;
+    subgrid1.Layout.Row = 1; subgrid1.Layout.Column = 1;
 
         % subgrid1
         hd.info = uilabel(subgrid1, ...
@@ -62,7 +55,7 @@ function drawGUI(default_path)
             'ValueChangedFcn', @manualFrameInput);
 
     subgrid2 = uigridlayout(gl, [1 2], 'Padding', [0 0 0 0]);
-    subgrid2.Layout.Row = 2; subgrid2.Layout.Column = 2;
+    subgrid2.Layout.Row = 1; subgrid2.Layout.Column = 2;
 
         hd.last = uibutton(subgrid2, 'Text', '<', ...
             'Tooltip','Ctrl+Click to change step size', ...
@@ -71,13 +64,15 @@ function drawGUI(default_path)
             'Tooltip','Ctrl+Click to change step size', ...
             'ButtonPushedFcn', @(src,evt)moveVideoFrame(1));
     
-    % Row 3: slider and play button
+    % Row 2: slider and play button
     hd.slider = uislider(gl, 'ValueChangedFcn', @sliderMoved);
+    hd.slider.Layout.Row = 2; hd.slider.Layout.Column = 1;
     hd.play = uibutton(gl, 'Text', 'Play', 'ButtonPushedFcn', @togglePlay);
+    hd.play.Layout.Row = 2; hd.play.Layout.Column = 2;
 
-    % Row 4: axes for video
+    % Row 3: axes for video
     ax = uiaxes(gl);
-    ax.Layout.Row = 4; ax.Layout.Column = [1 2];
+    ax.Layout.Row = 3; ax.Layout.Column = [1 2];
     ax.XTick = []; ax.YTick = [];
 
     % Timer for playback
@@ -85,45 +80,34 @@ function drawGUI(default_path)
         'Period', 0.02, ...
         'TimerFcn', @timerRunning);
 
-    hd.path = hPath;
     hd.ax = ax;
     axis(hd.ax, 'image'); axis(hd.ax, 'off');
     hold(hd.ax, "on");
 
     % add listeners
     hd.timeListener = addlistener(data, 'TimeChanged', @(src, ~)updateVideoTime(src.currentTime));
-    hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)updateInfo());
-    hd.dataListener = addlistener(data, 'DataChanged', @(~, ~)redrawVideo());
+    hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)onInfoChanged());
+    % DLC and gait changes only redraw markers; the frame is not re-read.
+    hd.dlcListener = addlistener(data, 'DLCChanged', @(~,~)redrawMarkers());
+    hd.gaitListener = addlistener(data, 'GaitChanged', @(~,~)redrawMarkers());
 
     data.video(1).hd = hd;
+    notify(data, 'WindowsChanged');
 end
 
 function openVideo(~,~)
+    if exportState.running, return; end
     hd = data.video.hd;
-    filename = hd.path.Value;
-    if exist(filename, "file") ~= 2
-        if isempty(filename)
-            filename='*.mp4';
-        else
-            [pathname, file, ext] = fileparts(filename);
-            if isempty(ext)
-                % it's a path
-                filename = fullfile(pathname, file, '*.mp4');
-            else
-                % it's a filename
-                filename = fullfile(pathname, ['*' ext]);
-            end
-        end
-        [file, path] = uigetfile(filename, 'Open Video file');
-        drawnow; figure(fig);
-        if isequal(file, 0); return; end
-        filename = fullfile(path, file);
-        hd.path.Value = filename;
-    end
+    [file, path] = uigetfile(fullfile(data.defaultPath, '*.mp4'), 'Open Video file');
+    drawnow; figure(fig);
+    if isequal(file, 0); return; end
+    filename = fullfile(path, file);
+    data.rememberPath(filename);
     stop(hd.timer);
     data.video.vid = VideoReader(filename);
+    data.video.filename = filename;
     data.video.frameIdx = 1;
-    
+
     data.video.hd = hd;
 
     data.video.frameRate = data.getFrameRate();
@@ -133,6 +117,137 @@ function openVideo(~,~)
     updateVideoFrame(1);
     data.setTime(data.video.t(1));
     notify(data, 'InfoChanged');
+end
+
+%% === Save: export the video with the markers drawn in ===
+% Frames are read in order at native resolution, markers are drawn into the
+% pixels (VIDEO.draw_markers) from one snapshot of markerState(), and
+% VideoWriter writes MPEG-4 at the session frame rate.
+function saveVideo(~,~)
+    if exportState.running, return; end
+    if ~data.has('video')
+        uialert(fig, 'There is no video to save.', 'Save');
+        return;
+    end
+    [range, ok] = shared.ask_save_range(fig, 'Video');
+    if ~ok, return; end
+    % frames with a time only (none past the last trigger)
+    t = data.video.t(:);
+    inside = isfinite(t);
+    if ~isempty(range), inside = inside & t >= range(1) & t <= range(2); end
+    if ~any(inside)
+        uialert(fig, 'No video frames lie in the zoom window.', 'Save');
+        return;
+    end
+    frames = (find(inside, 1):find(inside, 1, 'last'))';
+
+    source = data.video.filename;
+    [~, base] = fileparts(source);
+    [file, path] = uiputfile('*.mp4', 'Save video', fullfile(data.defaultPath, [base '_StepSync.mp4']));
+    drawnow; figure(fig);
+    if isequal(file, 0), return; end
+    filename = fullfile(path, file);
+    if strcmpi(filename, source)
+        uialert(fig, 'That is the source video. Choose another name.', 'Save refused');
+        return;
+    end
+    answer = inputdlg('Quality (0 to 100):', 'Video quality', [1 30], {'80'});
+    drawnow; figure(fig);
+    if isempty(answer), return; end
+    quality = str2double(answer{1});
+    if ~isscalar(quality) || ~isfinite(quality) || quality < 0 || quality > 100
+        uialert(fig, 'The quality must be a number from 0 to 100.', 'Save');
+        return;
+    end
+
+    state = markerState();
+    if ~isempty(state.dlc), state.dlc.tempX = []; state.dlc.tempY = []; end   % committed only
+    writer = VideoWriter(filename, 'MPEG-4');
+    writer.FrameRate = data.getFrameRate();
+    writer.Quality = round(quality);
+    data.rememberPath(filename);
+
+    hd = data.video.hd;
+    beginExport(hd, writer);
+    finish = onCleanup(@()endExport(hd));
+    written = 0;
+    try
+        written = VIDEO.write_marked_video(writer, source, frames, data.video.t, state, ...
+            pointScale(hd), @(k, n, img)exportProgress(hd, frames, k, n, img));
+    catch ME
+        if isvalid(fig), uialert(fig, ME.message, 'Save failed'); end
+    end
+    if ~isvalid(fig), return; end   % closed during the export: the file is finalized
+    aborted = exportState.abort;
+    clear finish   % restores the window
+    if aborted
+        uialert(fig, sprintf('Aborted after %d of %d frames. The partial video is in %s.', ...
+            written, numel(frames), filename), 'Save', 'Icon', 'warning');
+    elseif written == numel(frames)
+        uialert(fig, sprintf('%d frames saved in %s.', written, filename), 'Save', 'Icon', 'success');
+    end
+end
+
+% Video pixels per screen point: markers look as in the window now.
+function s = pointScale(hd)
+    vid = data.video.vid;
+    pos = getpixelposition(hd.ax);
+    screenPerVideo = min(pos(3) / vid.Width, pos(4) / vid.Height);
+    s = (96/72) / screenPerVideo;   % 96 screen pixels per inch
+end
+
+% Only the abort button stays usable; listeners pause; live markers hide.
+function beginExport(hd, writer)
+    exportState = struct('running', true, 'abort', false, 'writer', writer);
+    stop(hd.timer);
+    set([hd.frameRate hd.time hd.frame hd.last hd.next hd.slider], 'Enable', 'off');
+    hd.timeListener.Enabled = false;
+    hd.infoListener.Enabled = false;
+    hd.dlcListener.Enabled = false;
+    hd.gaitListener.Enabled = false;
+    % set([hd.timeListener hd.infoListener hd.dlcListener hd.gaitListener], 'Enabled', 'off');
+    for name = {'stepMarker', 'dlcMarker', 'dlcTempMarker'}
+        hideMarker(hd, name{1});
+    end
+    fig.Pointer = 'watch';
+    hd.play.Text = 'Abort (0%)';
+end
+
+function endExport(hd)
+    exportState.running = false;
+    exportState.writer = [];
+    if ~isvalid(fig), return; end
+    set([hd.frameRate hd.time hd.frame hd.last hd.next hd.slider], 'Enable', 'on');
+    hd.timeListener.Enabled = true;
+    hd.infoListener.Enabled = true;
+    hd.dlcListener.Enabled = true;
+    hd.gaitListener.Enabled = true;
+    fig.Pointer = 'arrow';
+    hd.play.Text = 'Play';
+    onInfoChanged();   % resync: frame, slider and markers at the current time
+end
+
+% Progress in the abort button and the slider; a preview every 10 frames.
+function ok = exportProgress(hd, frames, k, n, img)
+    ok = false;
+    if exportState.abort || ~isvalid(fig), return; end
+    if mod(k, 5) == 0 || k == n
+        hd.play.Text = sprintf('Abort (%d%%)', floor(100 * k / n));
+        hd.slider.Value = frames(k);
+        if mod(k, 10) == 0 && isfield(hd, 'image') && isgraphics(hd.image)
+            hd.image.CData = img(1:min(end, size(hd.image.CData, 1)), 1:min(end, size(hd.image.CData, 2)), :);
+        end
+        drawnow;   % keeps other windows and the abort button usable
+    end
+    ok = ~exportState.abort && isvalid(fig);
+end
+
+% The title shows the source video.
+function updateTitle()
+    fig.Name = 'Video Viewer';
+    if data.has('video') && isfield(data.video, 'filename')
+        fig.Name = ['Video Viewer: ' data.video.filename];
+    end
 end
 
 %% main == event response callback function
@@ -160,8 +275,7 @@ function updateVideoFrame(newFrameIdx)
     data.video.frameIdx = frameIdx;
     data.video.hd = hd;
 
-    drawDLCMarker
-    drawGaitMarker
+    redrawMarkers();
 end
 
 % timeChanged listen function
@@ -211,6 +325,7 @@ function updateInfo()
         data.video.vid.Height, data.video.vid.Width, totalFrames);
 
     data.video.hd = hd;
+    updateTitle();
 end
 
 function updateFrameRate(value)
@@ -254,6 +369,7 @@ function manualFrameInput(~,~)
 end
 
 function togglePlay(~,~)
+    if exportState.running, exportState.abort = true; return; end   % the button reads "Abort"
     if ~data.has('video'), return; end
     hd = data.video.hd;
     if strcmp(hd.play.Text, 'Play')
@@ -279,57 +395,97 @@ function timerRunning(~,~)
     drawnow
 end
 
-function redrawVideo()
-    if data.has('video'), updateVideoFrame(shared.time_to_frame(data.video.t,data.currentTime)); end
+function onInfoChanged()
+    if ~data.has('video'), return; end
+    updateInfo();
+    % the time base may have changed: show the frame at the current time
+    updateVideoFrame(shared.time_to_frame(data.video.t, data.currentTime));
 end
 
-% if there's DLC, draw the marker on the video
-function drawDLCMarker()
+% === markers ==============================================================
+% All markers on the video are drawn here, from a marker state. The live
+% display builds the state from the current DLC and gait data; a video
+% export takes one snapshot of it so later edits do not affect the file.
+
+function redrawMarkers()
+    if ~data.has('video'), return; end
+    drawMarkers(markerState(), data.video.frameIdx);
+end
+
+% Collect what the markers need from the DLC and gait modules.
+%   state.dlc   [] or struct: bodypart, x, y (per frame), tempX, tempY ([] if none)
+%   state.steps [] or struct: t, x, y (per step), from GAIT.current_steps
+function state = markerState()
+    state = struct('dlc', [], 'steps', []);
     if data.has('dlc')
-        hd = data.video.hd;
-        frameIdx = data.video.frameIdx;
         tabledlc = data.dlc.table;
-        if frameIdx > height(tabledlc)
-            for field = {'dlcMarker','dlcTempMarker'}
-                if isfield(hd, field{1}) && isgraphics(hd.(field{1}))
-                    hd.(field{1}).Visible = 'off';
-                end
-            end
-            return;
-        end
         bodypart = data.dlc.hd.list_bodyparts.Value;
-
-        % show temp marker
-        hasTemp = ismember('temp_x', tabledlc.Properties.VariableNames) && ...
-            isfield(data.dlc, 'seg_bodypart') && strcmp(data.dlc.seg_bodypart, bodypart);
-        if hasTemp
-            hd = shared.myPlot( ...
-                @plot, hd, 'dlcTempMarker', hd.ax, ...
-                tabledlc.temp_x(frameIdx), tabledlc.temp_y(frameIdx), ...
-                'go', 'LineWidth', 2, 'HitTest','off');
-            hd.dlcTempMarker.Visible = 'on';
-        elseif isfield(hd, 'dlcTempMarker') && isgraphics(hd.dlcTempMarker)
-            hd.dlcTempMarker.Visible = 'off';
+        d.bodypart = bodypart;
+        d.x = tabledlc.([bodypart '_x']);
+        d.y = tabledlc.([bodypart '_y']);
+        d.tempX = []; d.tempY = [];
+        if ismember('temp_x', tabledlc.Properties.VariableNames) && ...
+                isfield(data.dlc, 'seg_bodypart') && strcmp(data.dlc.seg_bodypart, bodypart)
+            d.tempX = tabledlc.temp_x;
+            d.tempY = tabledlc.temp_y;
         end
+        state.dlc = d;
+    end
+    state.steps = GAIT.current_steps(data);
+end
 
-        % show marker
+% Draw the markers of one frame. Step markers fade with distance in time
+% from the frame: alpha = 2/(1+exp(|t_step - t_frame| / 1 s)).
+function drawMarkers(state, frameIdx)
+    hd = data.video.hd;
+
+    % gait steps
+    if ~isempty(state.steps) && ~isempty(state.steps.t)
+        hd = shared.myPlot(@scatter, hd, 'stepMarker', hd.ax, ...
+            state.steps.x, state.steps.y, ...
+            'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, 'HitTest', 'off');
+        frameT = data.video.t(frameIdx);
+        set(hd.stepMarker, 'AlphaData', stepAlpha(state.steps.t, frameT), ...
+            'MarkerEdgeAlpha', 'flat', 'Visible', 'on');
+    else
+        hd = hideMarker(hd, 'stepMarker');
+    end
+
+    % DLC: committed marker on top, fix preview below it
+    d = state.dlc;
+    if isempty(d) || frameIdx > numel(d.x)
+        hd = hideMarker(hd, 'dlcMarker');
+        hd = hideMarker(hd, 'dlcTempMarker');
+    else
+        if ~isempty(d.tempX)
+            hd = shared.myPlot(@plot, hd, 'dlcTempMarker', hd.ax, ...
+                d.tempX(frameIdx), d.tempY(frameIdx), 'go', 'LineWidth', 2, 'HitTest','off');
+            hd.dlcTempMarker.Visible = 'on';
+        else
+            hd = hideMarker(hd, 'dlcTempMarker');
+        end
         hd = shared.myPlot(@plot, hd, 'dlcMarker', hd.ax, ...
-                tabledlc.([bodypart '_x'])(frameIdx), tabledlc.([bodypart '_y'])(frameIdx), ...
-                'c+', 'LineWidth', 2, 'HitTest','off');
+            d.x(frameIdx), d.y(frameIdx), 'c+', 'LineWidth', 2, 'HitTest','off');
         hd.dlcMarker.Visible = 'on';
         uistack(hd.dlcMarker, "top")
-        data.video.hd = hd;
+    end
+    data.video.hd = hd;
+end
+
+function hd = hideMarker(hd, field)
+    if isfield(hd, field) && isgraphics(hd.(field))
+        hd.(field).Visible = 'off';
     end
 end
 
-% if there's gait, draw gait landmarks on the video
-function drawGaitMarker()
-    % gait marker is implemented in the GAIT.gait_viewer module
+function a = stepAlpha(stepT, frameT)
+    a = 2 ./ (1 + exp(abs(stepT - frameT)));
 end
 
 % drag the markers ==========================
 function onMouseDown(~, ~)
-    if data.has('dlc') 
+    if exportState.running, return; end
+    if data.has('dlc')
         hd = data.video.hd;
         % begin dragging
         cp = hd.ax.CurrentPoint;   % [x y] in axes data units
@@ -360,6 +516,7 @@ function onMouseDown(~, ~)
 end
 
 function onMouseUp(~, ~)
+    if exportState.running, return; end
     hd = data.video.hd;
     % update xy data and finish dragging
     if isfield(data.video, 'drag')
@@ -371,16 +528,18 @@ function onMouseUp(~, ~)
             data.dlc.table.([bodypart '_x'])(frameIdx) = drag.marker.XData;
             data.dlc.table.([bodypart '_y'])(frameIdx) = drag.marker.YData;
             data.dlc.previewParameters = []; % source changed; regenerate before Save As
+            data.notifyDLC('edit', {bodypart});
         elseif isequal(drag.marker, hd.dlcTempMarker)
             data.dlc.table.temp_x(frameIdx) = drag.marker.XData;
             data.dlc.table.temp_y(frameIdx) = drag.marker.YData;
+            data.notifyDLC('preview');
         end
-        notify(data,'DataChanged');
         data.video = rmfield(data.video, 'drag');
     end
 end
 
 function onMouseMove(~, ~)
+    if exportState.running, return; end
     hd = data.video.hd;
     cp = hd.ax.CurrentPoint;
     cx = cp(1,1);  cy = cp(1,2);
@@ -415,6 +574,13 @@ function onMouseMove(~, ~)
 end
 
 function onClose(~,~)
+    if ~shared.confirm_close(fig, 'Video Viewer'), return; end
+    % During an export: finalize the file now. The export loop resumes only
+    % after this returns, possibly after Exit all deleted the session.
+    if exportState.running
+        exportState.abort = true;
+        if ~isempty(exportState.writer), close(exportState.writer); end
+    end
     hd=data.video.hd;
     % Stop timer
     if isfield(hd, 'timer') && isvalid(hd.timer)
@@ -438,5 +604,6 @@ function onClose(~,~)
     % Clear saved figure handle
     data.fig = rmfield(data.fig, 'video');
     delete(fig);  % finally close the GUI
+    data.moduleClosed();
 end
 end

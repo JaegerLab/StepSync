@@ -1,7 +1,7 @@
-function [new_data, new_t] = emg_prep(data, t, options)
+function [new_data, new_t, new_fs] = emg_prep(data, t, options, fs)
 % pre-process EMG data, high-pass, rectify, smooth then downsample
 % Syntax
-%  [new_data, new_t] = emg_prep(data, t, options)
+%  [new_data, new_t, new_fs] = emg_prep(data, t, options, fs)
 %
 % Parameters:
 %  emg: 2-D array, each channel is vertical vector
@@ -11,17 +11,21 @@ function [new_data, new_t] = emg_prep(data, t, options)
 %       FiltFilt: boolean. true uses filtfilt, false (default) uses filter
 %       Rectify: boolean. true or false(default)
 %       DownSampleRate: a number. frequency to down sample to
+%  fs: sample rate of data (default: from t)
 % Outputs:
 %  new_data: processed data. data at negative time are truncated.
 %  new_t: down sampled t. negative time are truncated.
-% 
+%  new_fs: achieved sample rate, fs/round(fs/DownSampleRate), or fs
+%
 % Li Su. 2/27/2026
 
 %%
-fs = 1/mean(diff(t));
+if nargin < 4 || isempty(fs), fs = 1/mean(diff(t)); end
+new_fs = fs;
 new_data = data;
 
 hd = waitbar(0,'Processing ...', 'Name', 'Processing');
+closeBar = onCleanup(@()delete(hd));   % also on errors
 drawnow
 
 if isfield(options, 'HighPassFreq')
@@ -51,11 +55,12 @@ if isfield(options, 'DownSampleRate')
     waitbar(2/3, hd, 'Downsampling')
     new_data = downsample(new_data(t>=0,:), downsample_factor);
     new_t = downsample(t(t>=0), downsample_factor);
+    new_fs = fs / downsample_factor;
 else
     % truncate (discard negative time)
     new_data = new_data(t>=0,:);
     new_t = t(t>=0);
 end
 
-close(hd)
+clear closeBar
 

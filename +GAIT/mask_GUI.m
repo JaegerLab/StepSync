@@ -48,7 +48,7 @@ function maskFig = mask_GUI(mousePos)
     
     %% draw GUI
     mousePos=mousePos-[250 250];
-    maskFig = uifigure('Name', 'Edit Mask', 'Position', [mousePos 500 500], ...
+    maskFig = uifigure('Name', 'Edit Mask', 'Position', shared.place_window([mousePos 500 500]), ...
         'CloseRequestFcn', @onClose);
 
 
@@ -264,19 +264,22 @@ function maskFig = mask_GUI(mousePos)
     end
 
     function readSpeedFromFile()
+        startIn = data.defaultPath;
+        if ~isempty(startIn), startIn = [startIn filesep]; end
         [fileName, folder] = uigetfile( ...
             { ...
             '*.mat',       'MAT-files (*.mat)'
             '*.csv;*.txt', 'Delimited text (*.csv, *.txt)'
             '*.*',         'All files'
             }, ...
-            'Select speed file');
-    
+            'Select speed file', startIn);
+
         if isequal(fileName, 0)
             return
         end
-    
+
         filePath = fullfile(folder, fileName);
+        data.rememberPath(filePath);
         [~, ~, extension] = fileparts(filePath);
     
         switch lower(extension)
@@ -1189,7 +1192,7 @@ function maskFig = mask_GUI(mousePos)
         data.gait.mask = buildCombinedMask();
         if isfield(data.gait, 'maskTemp'), data.gait = rmfield(data.gait, 'maskTemp'); end
         syncPublicState();
-        notify(data, 'DataChanged');
+        notify(data, 'MaskChanged');
         close(maskFig);
     end
 
@@ -1228,8 +1231,9 @@ function maskFig = mask_GUI(mousePos)
         if isfield(data.gait, 'maskTemp')
             data.gait = rmfield(data.gait, 'maskTemp');
         end
-        notify(data, 'DataChanged');
+        notify(data, 'MaskPreviewChanged');
         delete(src);
+        notify(data, 'WindowsChanged');
     end
 end
 

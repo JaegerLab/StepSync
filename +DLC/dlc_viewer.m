@@ -76,7 +76,8 @@ function fig = dlc_viewer(default_path)
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateDLCtime(src.currentTime));
         hd.zoomListener = addlistener(data, 'ZoomChanged', @(src, evt)updateDLCzoom(src.currentZoom));
-        hd.dataListener = addlistener(data, 'DataChanged', @(src, evt)showBodypart());
+        hd.dlcListener = addlistener(data, 'DLCChanged', @(src, evt)showBodypart());
+        hd.gaitListener = addlistener(data, 'GaitChanged', @(src, evt)drawSteps());
         hd.infoListener = addlistener(data, 'InfoChanged', @(src, evt)updateInfo());
 
         data.dlc(1).hd = hd;
@@ -122,13 +123,13 @@ function fig = dlc_viewer(default_path)
         % update frame rate and total frames
         notify(data, 'InfoChanged')
         % draw trajectory plot
-        notify(data, 'DataChanged');
+        data.notifyDLC('open', tabledlc.Properties.UserData);
         % draw time line
         updateDLCtime(data.currentTime);
     end
 
     function listChanged()
-        notify(data,'DataChanged');
+        data.notifyDLC('selection');
     end
 
     % main update function.=========================
@@ -211,6 +212,30 @@ function fig = dlc_viewer(default_path)
         end
         data.dlc.hd = hd;
         updateLegend(hd);
+        drawSteps();
+    end
+
+    % gait steps on the X and Y traces (left axis), following the X/Y checkboxes
+    function drawSteps()
+        if ~isfield(data.dlc, 'hd'), return; end
+        hd = data.dlc.hd;
+        steps = GAIT.current_steps(data);
+        if data.has('dlc') && ~isempty(steps) && ~isempty(steps.t)
+            if numel(hd.ax.YAxis) > 1, yyaxis(hd.ax, 'left'); end
+            spec = {'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, ...
+                'HitTest', 'off', 'HandleVisibility', 'off'};
+            hd = shared.myPlot(@scatter, hd, 'stepX', hd.ax, steps.t, steps.x, spec{:});
+            hd = shared.myPlot(@scatter, hd, 'stepY', hd.ax, steps.t, steps.y, spec{:});
+            hd.stepX.Visible = hd.chk_x.Value;
+            hd.stepY.Visible = hd.chk_y.Value;
+        else
+            for field = {'stepX', 'stepY'}
+                if isfield(hd, field{1}) && isgraphics(hd.(field{1}))
+                    hd.(field{1}).Visible = 'off';
+                end
+            end
+        end
+        data.dlc.hd = hd;
     end
 
     % One legend entry per item. Fix layers exist twice (x and y copies with
@@ -345,11 +370,7 @@ function fig = dlc_viewer(default_path)
         hd = setFixVisible(hd, '_x', src.Value && has_fix);
         data.dlc.hd = hd;
         updateLegend(hd);
-        if data.has('gait')
-            if isfield(data.gait.hd, 'stepXDLC') && ishghandle(data.gait.hd.stepXDLC)
-                data.gait.hd.stepXDLC.Visible = src.Value && data.gait.hd.stepCheck.Value;
-            end
-        end
+        drawSteps();
     end
     function checkYChanged(src,~)
         hd = data.dlc.hd;
@@ -360,11 +381,7 @@ function fig = dlc_viewer(default_path)
         hd = setFixVisible(hd, '_y', src.Value && has_fix);
         data.dlc.hd = hd;
         updateLegend(hd);
-        if data.has('gait')
-            if isfield(data.gait.hd, 'stepYDLC') && ishghandle(data.gait.hd.stepYDLC)
-                data.gait.hd.stepYDLC.Visible = src.Value && data.gait.hd.stepCheck.Value;
-            end
-        end
+        drawSteps();
     end
 
     function checkPChanged(src,~)
@@ -490,7 +507,7 @@ function fig = dlc_viewer(default_path)
         data.dlc.table.temp_y = tempY;
         data.dlc.table.temp_likelihood = DLC.seg_likelihood(seg);
         data.dlc.seg = seg;
-        notify(data, 'DataChanged');
+        data.notifyDLC('preview');
     end
 
     % frame at such that the clicked jump lies between frames a and a+1
@@ -589,17 +606,6 @@ function fig = dlc_viewer(default_path)
         if isfield(hd, 'fixGUI') && isgraphics(hd.fixGUI)
             close(hd.fixGUI)
         end
-        % Clear DLC markers on video
-        if data.has('video')
-            if isfield(data.video.hd, 'dlcMarker')
-                delete(data.video.hd.dlcMarker)
-                data.video.hd = rmfield(data.video.hd, 'dlcMarker');
-            end
-            if isfield(data.video.hd, 'dlcTempMarker')
-                delete(data.video.hd.dlcTempMarker)
-                data.video.hd = rmfield(data.video.hd, 'dlcTempMarker');
-            end
-        end
         % Clear all the handles and plots;
         field = fields(hd);
         for k=1:length(field)
@@ -616,6 +622,7 @@ function fig = dlc_viewer(default_path)
         data.dlc = struct();
         % Clear saved figure handle
         data.fig = rmfield(data.fig, 'dlc');
+        data.notifyDLC('close');   % e.g. the video viewer hides its DLC markers
         delete(src);  % finally close the GUI
     end
 end

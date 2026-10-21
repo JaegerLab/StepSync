@@ -69,7 +69,8 @@ function fig = emg_viewer(default_path)
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateEMGtime(src.currentTime));
         hd.zoomListener = addlistener(data, 'ZoomChanged', @(src, evt)updateEMGzoom(src.currentZoom));
-        hd.dataListener = addlistener(data, 'DataChanged', @(src, evt)updatePlots());
+        hd.emgListener = addlistener(data, 'EMGChanged', @(src, evt)updatePlots());
+        hd.gaitListener = addlistener(data, 'GaitChanged', @(src, evt)drawSteps());
         hd.InfoListener = addlistener(data, 'InfoChanged', @(src, evt)updateInfo());
 
         data.emg(1).hd = hd;
@@ -145,7 +146,7 @@ function fig = emg_viewer(default_path)
         hd.sortby.Enable = 'off';
 
         notify(data, 'InfoChanged');
-        notify(data, 'DataChanged');
+        notify(data, 'EMGChanged');
         notify(data, 'TimeChanged');
     end
 
@@ -240,6 +241,23 @@ function fig = emg_viewer(default_path)
             hd.timeline.Value = data.currentTime;
         else
             hd.timeline = xline(hd.ax, data.currentTime, 'k', 'HitTest','off');
+        end
+        data.emg.hd = hd;
+        drawSteps();
+    end
+
+    % gait steps as markers on the time axis (y = 0)
+    function drawSteps()
+        if ~isfield(data.emg, 'hd'), return; end
+        hd = data.emg.hd;
+        steps = GAIT.current_steps(data);
+        if data.has('emg') && ~isempty(steps) && ~isempty(steps.t)
+            hd = shared.myPlot(@scatter, hd, 'stepMarker', hd.ax, ...
+                steps.t, zeros(size(steps.t)), ...
+                'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, 'HitTest', 'off');
+            hd.stepMarker.Visible = 'on';
+        elseif isfield(hd, 'stepMarker') && isgraphics(hd.stepMarker)
+            hd.stepMarker.Visible = 'off';
         end
         data.emg.hd = hd;
     end

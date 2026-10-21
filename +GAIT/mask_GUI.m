@@ -1189,7 +1189,7 @@ function maskFig = mask_GUI(mousePos)
         data.gait.mask = buildCombinedMask();
         if isfield(data.gait, 'maskTemp'), data.gait = rmfield(data.gait, 'maskTemp'); end
         syncPublicState();
-        notify(data, 'DataChanged');
+        notify(data, 'MaskChanged');
         close(maskFig);
     end
 
@@ -1228,7 +1228,7 @@ function maskFig = mask_GUI(mousePos)
         if isfield(data.gait, 'maskTemp')
             data.gait = rmfield(data.gait, 'maskTemp');
         end
-        notify(data, 'DataChanged');
+        notify(data, 'MaskPreviewChanged');
         delete(src);
     end
 end

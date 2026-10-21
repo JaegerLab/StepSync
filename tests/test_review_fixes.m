@@ -97,3 +97,11 @@ verifyEqual(testCase,actual.gait.maskParam.SpeedUnits,'pixels/frame');
 verifyEmpty(testCase,actual.gait.maskParam.SpeedTime);
 verifyEqual(testCase,shared.migrate_session_time(actual),actual);
 end
+
+function testDlcChangedDataNormalisesBodyparts(testCase)
+evt = shared.DLCChangedData('edit',"paw");
+verifyEqual(testCase,evt.Kind,'edit');
+verifyEqual(testCase,evt.Bodyparts,{'paw'});
+evt = shared.DLCChangedData('selection');
+verifyTrue(testCase,iscell(evt.Bodyparts) && isempty(evt.Bodyparts));
+end

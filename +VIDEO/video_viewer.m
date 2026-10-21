@@ -92,8 +92,10 @@ function drawGUI(default_path)
 
     % add listeners
     hd.timeListener = addlistener(data, 'TimeChanged', @(src, ~)updateVideoTime(src.currentTime));
-    hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)updateInfo());
-    hd.dataListener = addlistener(data, 'DataChanged', @(~, ~)redrawVideo());
+    hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)onInfoChanged());
+    % DLC and gait changes only redraw markers; the frame is not re-read.
+    hd.dlcListener = addlistener(data, 'DLCChanged', @(~,~)redrawMarkers());
+    hd.gaitListener = addlistener(data, 'GaitChanged', @(~,~)redrawMarkers());
 
     data.video(1).hd = hd;
 end
@@ -160,8 +162,7 @@ function updateVideoFrame(newFrameIdx)
     data.video.frameIdx = frameIdx;
     data.video.hd = hd;
 
-    drawDLCMarker
-    drawGaitMarker
+    redrawMarkers();
 end
 
 % timeChanged listen function
@@ -279,52 +280,91 @@ function timerRunning(~,~)
     drawnow
 end
 
-function redrawVideo()
-    if data.has('video'), updateVideoFrame(shared.time_to_frame(data.video.t,data.currentTime)); end
+function onInfoChanged()
+    if ~data.has('video'), return; end
+    updateInfo();
+    % the time base may have changed: show the frame at the current time
+    updateVideoFrame(shared.time_to_frame(data.video.t, data.currentTime));
 end
 
-% if there's DLC, draw the marker on the video
-function drawDLCMarker()
+% === markers ==============================================================
+% All markers on the video are drawn here, from a marker state. The live
+% display builds the state from the current DLC and gait data; a video
+% export takes one snapshot of it so later edits do not affect the file.
+
+function redrawMarkers()
+    if ~data.has('video'), return; end
+    drawMarkers(markerState(), data.video.frameIdx);
+end
+
+% Collect what the markers need from the DLC and gait modules.
+%   state.dlc   [] or struct: bodypart, x, y (per frame), tempX, tempY ([] if none)
+%   state.steps [] or struct: t, x, y (per step), from GAIT.current_steps
+function state = markerState()
+    state = struct('dlc', [], 'steps', []);
     if data.has('dlc')
-        hd = data.video.hd;
-        frameIdx = data.video.frameIdx;
         tabledlc = data.dlc.table;
-        if frameIdx > height(tabledlc)
-            for field = {'dlcMarker','dlcTempMarker'}
-                if isfield(hd, field{1}) && isgraphics(hd.(field{1}))
-                    hd.(field{1}).Visible = 'off';
-                end
-            end
-            return;
-        end
         bodypart = data.dlc.hd.list_bodyparts.Value;
-
-        % show temp marker
-        hasTemp = ismember('temp_x', tabledlc.Properties.VariableNames) && ...
-            isfield(data.dlc, 'seg_bodypart') && strcmp(data.dlc.seg_bodypart, bodypart);
-        if hasTemp
-            hd = shared.myPlot( ...
-                @plot, hd, 'dlcTempMarker', hd.ax, ...
-                tabledlc.temp_x(frameIdx), tabledlc.temp_y(frameIdx), ...
-                'go', 'LineWidth', 2, 'HitTest','off');
-            hd.dlcTempMarker.Visible = 'on';
-        elseif isfield(hd, 'dlcTempMarker') && isgraphics(hd.dlcTempMarker)
-            hd.dlcTempMarker.Visible = 'off';
+        d.bodypart = bodypart;
+        d.x = tabledlc.([bodypart '_x']);
+        d.y = tabledlc.([bodypart '_y']);
+        d.tempX = []; d.tempY = [];
+        if ismember('temp_x', tabledlc.Properties.VariableNames) && ...
+                isfield(data.dlc, 'seg_bodypart') && strcmp(data.dlc.seg_bodypart, bodypart)
+            d.tempX = tabledlc.temp_x;
+            d.tempY = tabledlc.temp_y;
         end
+        state.dlc = d;
+    end
+    state.steps = GAIT.current_steps(data);
+end
 
-        % show marker
+% Draw the markers of one frame. Step markers fade with distance in time
+% from the frame: alpha = 2/(1+exp(|t_step - t_frame| / 1 s)).
+function drawMarkers(state, frameIdx)
+    hd = data.video.hd;
+
+    % gait steps
+    if ~isempty(state.steps) && ~isempty(state.steps.t)
+        hd = shared.myPlot(@scatter, hd, 'stepMarker', hd.ax, ...
+            state.steps.x, state.steps.y, ...
+            'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, 'HitTest', 'off');
+        frameT = data.video.t(frameIdx);
+        set(hd.stepMarker, 'AlphaData', stepAlpha(state.steps.t, frameT), ...
+            'MarkerEdgeAlpha', 'flat', 'Visible', 'on');
+    else
+        hd = hideMarker(hd, 'stepMarker');
+    end
+
+    % DLC: committed marker on top, fix preview below it
+    d = state.dlc;
+    if isempty(d) || frameIdx > numel(d.x)
+        hd = hideMarker(hd, 'dlcMarker');
+        hd = hideMarker(hd, 'dlcTempMarker');
+    else
+        if ~isempty(d.tempX)
+            hd = shared.myPlot(@plot, hd, 'dlcTempMarker', hd.ax, ...
+                d.tempX(frameIdx), d.tempY(frameIdx), 'go', 'LineWidth', 2, 'HitTest','off');
+            hd.dlcTempMarker.Visible = 'on';
+        else
+            hd = hideMarker(hd, 'dlcTempMarker');
+        end
         hd = shared.myPlot(@plot, hd, 'dlcMarker', hd.ax, ...
-                tabledlc.([bodypart '_x'])(frameIdx), tabledlc.([bodypart '_y'])(frameIdx), ...
-                'c+', 'LineWidth', 2, 'HitTest','off');
+            d.x(frameIdx), d.y(frameIdx), 'c+', 'LineWidth', 2, 'HitTest','off');
         hd.dlcMarker.Visible = 'on';
         uistack(hd.dlcMarker, "top")
-        data.video.hd = hd;
+    end
+    data.video.hd = hd;
+end
+
+function hd = hideMarker(hd, field)
+    if isfield(hd, field) && isgraphics(hd.(field))
+        hd.(field).Visible = 'off';
     end
 end
 
-% if there's gait, draw gait landmarks on the video
-function drawGaitMarker()
-    % gait marker is implemented in the GAIT.gait_viewer module
+function a = stepAlpha(stepT, frameT)
+    a = 2 ./ (1 + exp(abs(stepT - frameT)));
 end
 
 % drag the markers ==========================
@@ -371,11 +411,12 @@ function onMouseUp(~, ~)
             data.dlc.table.([bodypart '_x'])(frameIdx) = drag.marker.XData;
             data.dlc.table.([bodypart '_y'])(frameIdx) = drag.marker.YData;
             data.dlc.previewParameters = []; % source changed; regenerate before Save As
+            data.notifyDLC('edit', {bodypart});
         elseif isequal(drag.marker, hd.dlcTempMarker)
             data.dlc.table.temp_x(frameIdx) = drag.marker.XData;
             data.dlc.table.temp_y(frameIdx) = drag.marker.YData;
+            data.notifyDLC('preview');
         end
-        notify(data,'DataChanged');
         data.video = rmfield(data.video, 'drag');
     end
 end

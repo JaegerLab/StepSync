@@ -27,9 +27,20 @@ for k = 1:2
     S.gait.paw(k).raw_y = circshift(x,1)+(k-1)*20;
     S.gait.paw(k).thresh = struct('x',NaN,'y',NaN,'speed',NaN);
 end
-notify(S,'DataChanged');
+notify(S,'InfoChanged');   % gait recalculates on a time-base change
 verifyTrue(testCase,S.gait.stepsValid);
 first = S.gait.paw(1).rising;
+% Other viewers read steps through GAIT.current_steps, never gait's controls.
+steps = GAIT.current_steps(S);
+verifyEqual(testCase,steps.idx,first(:));
+verifyEqual(testCase,steps.t,S.gait.t(first(:)));
+verifyEqual(testCase,steps.x,S.gait.paw(1).raw_x(first(:)));
+hd.stepCheck.Value = false;
+callback = hd.stepCheck.ValueChangedFcn; callback(hd.stepCheck,[]);
+verifyEmpty(testCase,GAIT.current_steps(S));
+hd.stepCheck.Value = true;
+callback(hd.stepCheck,[]);
+verifyNotEmpty(testCase,GAIT.current_steps(S));
 % Mask GUI must work with the new data model (no per-paw .trace).
 verifyFalse(testCase,isfield(S.gait.paw,'trace'));
 maskFig = GAIT.mask_GUI([100 100]);
@@ -67,7 +78,7 @@ verifyEmpty(testCase,S.gait.paw(2).rising);
 S.gait = rmfield(S.gait,'maskTemp');
 % Commit an all-false mask: calculation succeeds and every marker disappears.
 S.gait.mask = false(size(S.gait.t));
-notify(S,'DataChanged');
+notify(S,'MaskChanged');
 verifyTrue(testCase,S.gait.stepsValid);
 verifyEmpty(testCase,S.gait.paw(2).rising);
 verifyEqual(testCase,hd.stepNum.Value,0);
@@ -76,6 +87,7 @@ S.gait.mask = true(numel(S.gait.t)+1,1);
 callback = hd.pawList.ValueChangedFcn;
 verifyError(testCase,@()callback(hd.pawList,[]),'GAIT:maskSize');
 verifyFalse(testCase,GAIT.steps_current(S));
+verifyEmpty(testCase,GAIT.current_steps(S));
 end
 
 function cleanupViewer(fig,S,rate)

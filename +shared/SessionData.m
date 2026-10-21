@@ -12,11 +12,14 @@ classdef SessionData < handle
     end
 
     events
-        TimeChanged
-        ZoomChanged
-        DataChanged
-        InfoChanged
-        MaskPreviewChanged
+        TimeChanged         % currentTime moved
+        ZoomChanged         % currentZoom moved
+        InfoChanged         % time base changed: frame rate, triggers, frame count
+        EMGChanged          % EMG traces changed (open, pre-process, delete)
+        DLCChanged          % DLC table or selection changed; carries shared.DLCChangedData
+        GaitChanged         % gait results changed: steps, selection, visibility
+        MaskChanged         % gait mask committed: gait recalculates steps
+        MaskPreviewChanged  % gait mask preview: gait redraws trace colours only
     end
 
     methods (Access = private)
@@ -82,6 +85,14 @@ classdef SessionData < handle
                 triggers = obj.emg.trigger.time;
             end
             t = shared.frame_times(nFrames, obj.getFrameRate(), triggers);
+        end
+
+        % Notify DLCChanged with what changed.
+        %   kind: 'open' | 'edit' | 'commit' | 'preview' | 'selection' | 'close' | 'load'
+        %   bodyparts: cellstr of changed body parts (may be empty)
+        function notifyDLC(obj, kind, bodyparts)
+            if nargin < 3, bodyparts = {}; end
+            notify(obj, 'DLCChanged', shared.DLCChangedData(kind, bodyparts));
         end
 
         % check if data section is available

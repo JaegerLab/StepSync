@@ -31,7 +31,7 @@ function fig = emg_prep_GUI(mousePos)
     drawnow
 
     data.emg.hd.datatype.Value = "Raw";
-    notify(data, 'DataChanged');
+    notify(data, 'EMGChanged');
 
     function preview(~,~)
         ch = data.emg.hd.chanList.Value(1);
@@ -43,7 +43,7 @@ function fig = emg_prep_GUI(mousePos)
         data.emg.temp.data = new_data;
         data.emg.temp.t = new_t;
 
-        notify(data, 'DataChanged');
+        notify(data, 'EMGChanged');
     end
 
     function saveClose(~,~)
@@ -83,7 +83,7 @@ function fig = emg_prep_GUI(mousePos)
         if isfield(data.emg, 'temp')
             data.emg = rmfield(data.emg, 'temp');
         end
-        notify(data, 'DataChanged');
+        notify(data, 'EMGChanged');
         delete(src)
     end
 end

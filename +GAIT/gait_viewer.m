@@ -1,6 +1,9 @@
 function fig = gait_viewer(default_path)
 
     data = shared.SessionData.instance();
+    % true while the "DLC changed" prompt is open; further DLCChanged
+    % events are ignored until the user answers it.
+    dlcPromptPending = false;
     drawGUI(default_path)
     
     function drawGUI(default_path)
@@ -82,9 +85,10 @@ function fig = gait_viewer(default_path)
         % add listeners
         hd.timeListener = addlistener(data, 'TimeChanged', @(src, evt)updateGaitTime(src.currentTime));
         hd.zoomListener = addlistener(data, 'ZoomChanged', @(src, evt)updateGaitZoom(src.currentZoom));
-        hd.dataListener = addlistener(data, 'DataChanged', @(~,~)updateInfo());
         hd.infoListener = addlistener(data, 'InfoChanged', @(~,~)updateInfo());
+        hd.maskListener = addlistener(data, 'MaskChanged', @(~,~)updateInfo());
         hd.previewListener = addlistener(data, 'MaskPreviewChanged', @(~,~)previewChanged());
+        hd.dlcListener = addlistener(data, 'DLCChanged', @(~,evt)onDLCChanged(evt));
 
         data.gait(1).hd = hd;
     end
@@ -102,11 +106,13 @@ function fig = gait_viewer(default_path)
             table_dlc = DLC.read_dlc(filename);
             part_list = table_dlc.Properties.UserData;
             hd.path.Value = pathname;
+            source = filename;
         else
             % read dlc from dlc_viewer
             table_dlc = data.dlc.table;
             part_list = data.dlc.hd.list_bodyparts.Items;
             hd.path.Value = data.dlc.hd.path.Value;
+            source = 'dlc_module';  % follow later DLC edits (see onDLCChanged)
         end
         
         % select paws
@@ -126,6 +132,8 @@ function fig = gait_viewer(default_path)
         invalidateSteps();
         oldHd = data.gait.hd;
         data.gait = struct('hd', oldHd);
+        data.gait.source = source;
+        dlcPromptPending = false;
         for ii = 1:numel(hd.pawList.Items) 
             pawName = hd.pawList.Items{ii};
             data.gait.paw(ii).name = pawName;
@@ -221,15 +229,27 @@ function fig = gait_viewer(default_path)
     end
 
     function invalidateSteps()
+        wasValid = isfield(data.gait, 'stepsValid') && data.gait.stepsValid;
         data.gait.stepsValid = false;
         hd = data.gait.hd;
-        handles = {'stepGait','stepEMG','stepXDLC','stepYDLC','stepVideo'};
-        for k = 1:numel(handles)
-            if isfield(hd, handles{k}) && isgraphics(hd.(handles{k}))
-                hd.(handles{k}).Visible = 'off';
-            end
+        if isfield(hd, 'stepGait') && isgraphics(hd.stepGait)
+            hd.stepGait.Visible = 'off';
         end
         hd.stepNum.Value = 0;
+        % Other viewers hide their step markers. A successful recalculation
+        % publishes again from plotSteps().
+        if wasValid, notify(data, 'GaitChanged'); end
+    end
+
+    % Copy the live gait selection into data.gait.selection, so that other
+    % viewers (via GAIT.current_steps) never read gait's UI controls.
+    function syncSelection()
+        hd = data.gait.hd;
+        sel.paw = hd.pawList.Value;
+        sel.trace = lower(hd.trace.Value);
+        sel.step = hd.stepList.Value;
+        sel.show = logical(hd.stepCheck.Value) && isequal(hd.stepCheck.Enable, 'on');
+        data.gait.selection = sel;
     end
 
     function thresh = selectedThreshold(trace, pawIdx, traceType)
@@ -243,6 +263,7 @@ function fig = gait_viewer(default_path)
 
     function getSteps()
         invalidateSteps();
+        syncSelection();
         hd = data.gait.hd;
         pawIdx = hd.pawList.Value;
         traceType = lower(hd.trace.Value);
@@ -292,61 +313,30 @@ function fig = gait_viewer(default_path)
         if ismember(selected,items), hd.stepList.Value = selected; else, hd.stepList.Value = 'rising'; end
     end
 
+    % Draw gait's own step markers, then tell the other viewers to redraw
+    % theirs from GAIT.current_steps(data).
     function plotSteps()
+        syncSelection();
         hd = data.gait.hd;
-        if GAIT.steps_current(data) && ...
-                hd.stepCheck.Value && isequal(hd.stepCheck.Enable, 'on')
-            % paw Steps
-            pawIdx = hd.pawList.Value;
-            stepName = hd.stepList.Value;
-            stepIdx = data.gait.paw(pawIdx).(stepName);
+        if GAIT.steps_current(data) && data.gait.selection.show
+            pawIdx = data.gait.selection.paw;
+            stepIdx = data.gait.paw(pawIdx).(data.gait.selection.step);
             stepT = data.gait.t(stepIdx);
-            stepX = data.gait.paw(pawIdx).x(stepIdx)*hd.resolution.Value;
-            stepY = data.gait.paw(pawIdx).y(stepIdx)*hd.resolution.Value;
 
             % numbers of gait step points.
             hd.stepNum.Value = length(stepIdx);
-                
-            selectedTrace = data.gait.paw(pawIdx).(lower(hd.trace.Value));
-            linespec = {'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2};
+
+            selectedTrace = data.gait.paw(pawIdx).(data.gait.selection.trace);
             hd = shared.myPlot(@scatter, hd, 'stepGait', hd.ax, ...
                             stepT, selectedTrace(stepIdx), ...
-                            linespec{:}, 'HitTest', 'off');
-    
-            if data.has('emg')
-                hd = shared.myPlot(@scatter, hd, 'stepEMG', data.emg.hd.ax, ...
-                                stepT, zeros(size(stepT)), ...
-                                linespec{:}, 'HitTest', 'off');
-            end
-    
-            if data.has('dlc')
-                hd = shared.myPlot(@scatter, hd, 'stepXDLC', data.dlc.hd.ax, ...
-                                stepT, stepX, linespec{:}, 'HitTest', 'off');
-                hd.stepXDLC.Visible = data.dlc.hd.chk_x.Value;
-                hd = shared.myPlot(@scatter, hd, 'stepYDLC', data.dlc.hd.ax, ...
-                                stepT, stepY, linespec{:}, 'HitTest', 'off');
-                hd.stepYDLC.Visible = data.dlc.hd.chk_y.Value;
-            end
-    
-            if data.has('video') 
-                hd = shared.myPlot(@scatter, hd, 'stepVideo', data.video.hd.ax, ...
-                                stepX, stepY, linespec{:}, 'HitTest', 'off');
-                timeWindow = 1;
-                set(hd.stepVideo, 'AlphaData', 2./(1 + exp(abs(stepT-data.currentTime)/timeWindow)), ...
-                    'MarkerEdgeAlpha', 'flat');
-            end
-    
-            for field = {'stepGait','stepEMG','stepXDLC','stepYDLC','stepVideo'}
-                if isfield(hd, field{1}) && isgraphics(hd.(field{1}))
-                    hd.(field{1}).Visible = 'on';
-                end
-            end
-            if isfield(hd, 'stepXDLC') && isgraphics(hd.stepXDLC)
-                hd.stepXDLC.Visible = data.dlc.hd.chk_x.Value;
-                hd.stepYDLC.Visible = data.dlc.hd.chk_y.Value;
-            end
-            data.gait.hd = hd;
+                            'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, ...
+                            'HitTest', 'off');
+            hd.stepGait.Visible = 'on';
+        elseif isfield(hd, 'stepGait') && isgraphics(hd.stepGait)
+            hd.stepGait.Visible = 'off';
         end
+        data.gait.hd = hd;
+        notify(data, 'GaitChanged');
     end
 
     function openMask(~,~)
@@ -440,17 +430,9 @@ function fig = gait_viewer(default_path)
     end
 
     function stepCheckChanged(src,~)
+        if ~data.has('gait'), return; end
         if src.Value && ~GAIT.steps_current(data), invalidateSteps(); return; end
-        hd = data.gait.hd;
-        handles = {'stepGait','stepEMG','stepXDLC','stepYDLC','stepVideo'};
-        for k=1:numel(handles)
-            if isfield(hd, handles{k}) && ishghandle(hd.(handles{k}))
-                hd.(handles{k}).Visible = src.Value;
-            end
-        end
-        if src.Value
-            plotSteps();
-        end
+        plotSteps();   % shows or hides markers here and in the other viewers
     end
 
     % === sync time and zoom ===========
@@ -465,21 +447,6 @@ function fig = gait_viewer(default_path)
     
             zoomlim = shared.zoom(get(hd.ax,'xLim'), currentTime, 'pan');
             data.setZoom(zoomlim);
-    
-            if data.has('video')
-                updateVideoMarker(currentTime)
-            end
-        end
-    end
-
-    function updateVideoMarker(currentTime)
-        if ~GAIT.steps_current(data), return; end
-        hd = data.gait.hd;
-        if isfield(hd, 'stepVideo') && ishghandle(hd.stepVideo)
-            stepIdx = data.gait.paw(hd.pawList.Value).(hd.stepList.Value);
-            stepT = data.gait.t(stepIdx);
-            set(hd.stepVideo, ...
-                "AlphaData", 2./(1 + exp(abs(stepT-currentTime))) );
         end
     end
     
@@ -526,6 +493,80 @@ function fig = gait_viewer(default_path)
         end
     end
     
+    % === follow edits in the DLC viewer ===========
+    % Only when the paws were imported from the DLC viewer. Prompt once on
+    % the first relevant change; ignore further changes until answered.
+    function onDLCChanged(evt)
+        if dlcPromptPending || ~data.has('gait'), return; end
+        if ~isfield(data.gait, 'source') || ~strcmp(data.gait.source, 'dlc_module'), return; end
+        if ~ismember(evt.Kind, {'open', 'edit', 'commit'}), return; end
+        pawNames = {data.gait.paw.name};
+        changed = intersect(evt.Bodyparts, pawNames, 'stable');
+        if isempty(changed), return; end
+
+        dlcPromptPending = true;
+        if strcmp(evt.Kind, 'open')
+            what = 'A new DLC file was opened in the DLC viewer.';
+        else
+            what = sprintf('DLC data changed for: %s.', strjoin(changed, ', '));
+        end
+        msg = sprintf(['%s\n\nUpdate the gait paws from the DLC viewer, or keep the ' ...
+            'copy imported earlier?\nUpdate also includes any DLC changes made ' ...
+            'while this message is open.'], what);
+        uiconfirm(fig, msg, 'DLC changed', ...
+            'Options', {'Update', 'Keep'}, 'DefaultOption', 1, 'CancelOption', 2, ...
+            'Icon', 'question', 'CloseFcn', @onDLCAnswer);
+    end
+
+    function onDLCAnswer(~, evt)
+        dlcPromptPending = false;
+        if strcmp(evt.SelectedOption, 'Update'), updatePawsFromDLC(); end
+    end
+
+    % Re-copy every imported paw from the current DLC table, keeping the
+    % thresholds, then recalculate.
+    function updatePawsFromDLC()
+        if ~data.has('gait'), return; end
+        if ~data.has('dlc')
+            uialert(fig, 'The DLC viewer has no data. The gait paws were kept.', 'Update');
+            return;
+        end
+        table_dlc = data.dlc.table;
+        nOld = numel(data.gait.paw(1).raw_x);
+        missing = {};
+        for ii = 1:numel(data.gait.paw)
+            name = data.gait.paw(ii).name;
+            if all(ismember({[name '_x'], [name '_y']}, table_dlc.Properties.VariableNames))
+                data.gait.paw(ii).raw_x = table_dlc.([name '_x']);
+                data.gait.paw(ii).raw_y = table_dlc.([name '_y']);
+            else
+                missing{end+1} = name; %#ok<AGROW>
+            end
+        end
+        notes = {};
+        if ~isempty(missing)
+            notes{end+1} = sprintf('Not found in the DLC data, kept unchanged: %s.', ...
+                strjoin(missing, ', '));
+        end
+        if height(table_dlc) ~= nOld
+            if ~isempty(missing)
+                % paws of different lengths cannot share one time base
+                uialert(fig, sprintf(['The DLC data has %d frames, the gait data %d, and ' ...
+                    'some paws are missing. Import DLC again instead.'], ...
+                    height(table_dlc), nOld), 'Update failed');
+                return;
+            end
+            % frame count changed: the mask no longer fits, start over
+            data.gait.mask = true(height(table_dlc), 1);
+            if isfield(data.gait, 'maskTemp'), data.gait = rmfield(data.gait, 'maskTemp'); end
+            notes{end+1} = 'The number of frames changed, so the mask was reset.';
+        end
+        updateInfo();
+        if ~isempty(notes)
+            uialert(fig, strjoin(notes, newline), 'Update', 'Icon', 'warning');
+        end
+    end
+
     % close function =================================
     function onClose(src,~)
         hd = data.gait.hd;
@@ -546,6 +587,7 @@ function fig = gait_viewer(default_path)
             end
         end
 
+        notify(data, 'GaitChanged');   % other viewers remove their step markers
         delete(src);  % finally close the GUI
     end
 

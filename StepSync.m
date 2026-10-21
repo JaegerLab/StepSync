@@ -123,8 +123,10 @@ function hfig = StepSync(default_path)
             data.emg.trigger.number = numel(data.emg.trigger.time);
         end
         % activate data display in each module
+        % (gait recalculates on InfoChanged and then publishes GaitChanged)
         notify(data, 'InfoChanged');
-        notify(data, 'DataChanged');
+        notify(data, 'EMGChanged');
+        data.notifyDLC('load');
         % Assignments above do not emit events; synchronize restored views explicitly.
         data.currentTime = savedata.currentTime;
         data.currentZoom = savedata.currentZoom;

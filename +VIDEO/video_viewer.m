@@ -201,7 +201,11 @@ function beginExport(hd, writer)
     exportState = struct('running', true, 'abort', false, 'writer', writer);
     stop(hd.timer);
     set([hd.frameRate hd.time hd.frame hd.last hd.next hd.slider], 'Enable', 'off');
-    set([hd.timeListener hd.infoListener hd.dlcListener hd.gaitListener], 'Enabled', false);
+    hd.timeListener.Enabled = false;
+    hd.infoListener.Enabled = false;
+    hd.dlcListener.Enabled = false;
+    hd.gaitListener.Enabled = false;
+    % set([hd.timeListener hd.infoListener hd.dlcListener hd.gaitListener], 'Enabled', 'off');
     for name = {'stepMarker', 'dlcMarker', 'dlcTempMarker'}
         hideMarker(hd, name{1});
     end
@@ -214,7 +218,10 @@ function endExport(hd)
     exportState.writer = [];
     if ~isvalid(fig), return; end
     set([hd.frameRate hd.time hd.frame hd.last hd.next hd.slider], 'Enable', 'on');
-    set([hd.timeListener hd.infoListener hd.dlcListener hd.gaitListener], 'Enabled', true);
+    hd.timeListener.Enabled = true;
+    hd.infoListener.Enabled = true;
+    hd.dlcListener.Enabled = true;
+    hd.gaitListener.Enabled = true;
     fig.Pointer = 'arrow';
     hd.play.Text = 'Play';
     onInfoChanged();   % resync: frame, slider and markers at the current time

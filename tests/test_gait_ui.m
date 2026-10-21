@@ -97,9 +97,9 @@ assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI
 EMG.emg_viewer();
 cleanup = onCleanup(@()shared.exit_all(false));
 hd = S.emg.hd;
-S.emg.analog_data = zeros(101,2);
+S.emg.raw = struct('data',zeros(101,2),'t',(0:0.01:1)','sample_rate',100);
 S.emg.analog_channels = {'raw1','raw2'};
-S.emg.t = (0:0.01:1)'; S.emg.sample_rate = 100; S.emg.display_name = pwd;
+S.emg.display_name = pwd;
 S.emg.ch_mapping = table({'B';'A'},{'mapped1';'mapped2'},'VariableNames',{'Muscle','Names'});
 hd.sortby.Items = {'Muscle'}; hd.sortby.Value = 'Muscle';
 hd.chanList.Items = {'raw1','raw2'}; hd.chanList.ItemsData = [1 2]; hd.chanList.Value = 1;
@@ -210,4 +210,58 @@ verifyTrue(testCase,S.gait.stepsValid);
 verifyEqual(testCase,[S.frameRate S.currentTime],[20 2]);
 verifyEqual(testCase,S.currentZoom,[1 3]);
 verifyFalse(testCase,S.closingAll);
+end
+function testEmgTypesFollowProcessingAndDeletion(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+cleanup = onCleanup(@()shared.exit_all(false));
+fig = EMG.emg_viewer();
+hd = S.emg.hd;
+verifyEmpty(testCase,hd.datatype.Items);   % placeholder "no data"
+verifyEqual(testCase,hd.datatype.Placeholder,'no data');
+t = (0:1999)'/2000;   % 2 kHz: the default 500 Hz high pass is below Nyquist
+S.emg.raw = struct('data',[sin(2*pi*50*t) cos(2*pi*50*t)],'t',t,'sample_rate',2000);
+S.emg.processed = struct('data',{},'t',{},'sample_rate',{},'parameters',{});
+S.emg.analog_channels = {'A','B'}; S.emg.display_name = pwd;
+S.emg.trigger = struct('time',(0:0.1:0.9)','freq',10,'number',10);
+notify(S,'InfoChanged'); notify(S,'EMGChanged');
+verifyEqual(testCase,hd.datatype.Items,{'Raw'});
+verifyTrue(testCase,logical(hd.deleteType.Enable));
+% pre-process Raw: the delete button is off while the window is open
+preprocess = findall(fig,'Type','uibutton','Text','Pre-Process');
+callback = preprocess.ButtonPushedFcn; callback(preprocess,[]);
+prep = S.emg.hd.prepGUI;
+verifyFalse(testCase,logical(hd.deleteType.Enable));
+rate = findall(prep,'Type','uinumericeditfield','Value',200); rate.Value = 300;
+apply = findall(prep,'Type','uibutton','Text','Apply & Close');
+callback = apply.ButtonPushedFcn; callback(apply,[]);
+verifyFalse(testCase,isgraphics(prep));
+verifyTrue(testCase,logical(hd.deleteType.Enable));
+verifyEqual(testCase,hd.datatype.Items,{'Raw','Processed 1'});
+verifyEqual(testCase,hd.datatype.Value,'Processed 1');
+p = S.emg.processed(1);
+verifyEqual(testCase,p.sample_rate,2000/7,'AbsTol',1e-9);   % achieved 2000/round(2000/300), not requested
+verifyEqual(testCase,p.parameters.Source,'Raw');
+verifyEqual(testCase,p.parameters.DownSampleRate,300);
+% processing a processed type records it as the source
+callback = preprocess.ButtonPushedFcn; callback(preprocess,[]);
+prep = S.emg.hd.prepGUI;
+check = findall(prep,'Type','uicheckbox','Text','Down Sample'); check.Value = false;
+check = findall(prep,'Type','uicheckbox','Text','High Pass'); check.Value = false;   % 500 Hz is above Nyquist here
+apply = findall(prep,'Type','uibutton','Text','Apply & Close');
+callback = apply.ButtonPushedFcn; callback(apply,[]);
+verifyEqual(testCase,S.emg.processed(2).parameters.Source,'Processed 1');
+verifyEqual(testCase,S.emg.processed(2).sample_rate,2000/7,'AbsTol',1e-9);   % no down sampling
+% delete Raw, then everything: metadata stays, the placeholder returns
+S.emg = EMG.emg_delete(S.emg,'Raw'); notify(S,'EMGChanged');
+verifyEqual(testCase,hd.datatype.Items,{'Processed 1','Processed 2'});
+verifyTrue(testCase,S.has('emg'));
+S.emg = EMG.emg_delete(S.emg,'Processed 1');
+S.emg = EMG.emg_delete(S.emg,'Processed 1'); notify(S,'EMGChanged');
+verifyFalse(testCase,S.has('emg'));
+verifyEmpty(testCase,hd.datatype.Items);
+verifyFalse(testCase,logical(hd.deleteType.Enable));
+verifyEqual(testCase,S.emg.trigger.freq,10);
+verifyEqual(testCase,S.getFrameRate(),10);   % frame timing still follows the trigger
 end

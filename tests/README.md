@@ -23,7 +23,11 @@ covers sub-window placement on multiple monitors, the session reset after the
 last module window closes, and the remembered dialog folder. `test_sessions`
 writes session files and reads them back (selected modules only, format
 marker `fileFormat = 'StepSync session'`, `formatVersion = 3`) and checks that
-other files, older and newer formats are rejected.
+other files, older and newer formats are rejected. `test_emg` covers the EMG
+data types (Raw, Processed 1..N, renumbering after delete, `has('emg')` with
+processed data only, frame timing from the trigger without data), the EMG
+`.mat` file (selected types, processed-only loading, rejected files) and the
+achieved sample rate after down sampling.
 
 Close StepSync before running the desktop integration test:
 
@@ -37,7 +41,10 @@ preview versus commit, threshold persistence, all-false masks and invalidation
 after a failed calculation, and the menu bar: launcher closing, Window menu
 checkmarks and sub-windows, and Exit all resetting the session; and that
 restoring a session replaces all module windows and brings back window
-positions, widget values, data, frame rate, time and zoom. The viewers
+positions, widget values, data, frame rate, time and zoom; and that EMG
+pre-processing adds Processed types from the selected source (with the
+achieved rate and `parameters.Source`), the delete button is off while the
+pre-process window is open, and deleting every type keeps the trigger. The viewers
 are closed with `shared.exit_all(false)`, which skips the close confirmations.
 It is skipped without a desktop MATLAB session.
 
@@ -74,6 +81,20 @@ Manual checks with representative recordings are still required:
   that loading reopens just those. With no module open it shows an alert.
 - Load session asks once when module windows are open, not from the launcher;
   a non-session or old session file shows an alert and closes nothing.
+
+Manual checks of EMG:
+
+- Pre-process Raw, then pre-process Processed 1: the preview (yellow)
+  overlays the selected source; the dropdown lists Raw, Processed 1, 2.
+- The ✕ button asks before deleting the selected type (also Raw); remaining
+  processed types are renumbered; with everything deleted the dropdown shows
+  "no data", plots disappear, and the video still uses the trigger timing.
+- Save with several types offers a selection; the title switches to the saved
+  file. Choosing the `.mat` the EMG was opened from is refused.
+- Open .mat lists raw/processed with sizes; open only a processed type and
+  check plots, channel map/sort, STA and zoom without raw data.
+- Without open-ephys-matlab-tools on the path, opening an Open Ephys folder
+  prints a message, shows a message box with the install link, and stops.
 - Preview a pose correction, switch body part/settings and Save As; check source identity.
 
 Validation performed in the editing environment: MISS_HIT parsed all 38 MATLAB

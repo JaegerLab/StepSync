@@ -134,13 +134,9 @@ function fig = sta_GUI(mousePos)
         % EMG channel & type
         emgType = data.emg.hd.datatype.Value;
         channel = data.emg.hd.chanList.Value;
-        if strcmp(emgType, 'Raw')
-            emg  = data.emg.analog_data(:, channel);
-            emgT = data.emg.t;
-        else
-            emg  = data.emg.processed.data(:, channel);
-            emgT = data.emg.processed.t;
-        end
+        src  = EMG.emg_source(data.emg, emgType);
+        emg  = src.data(:, channel);
+        emgT = src.t;
 
         if ~GAIT.steps_current(data)
             uialert(fig, 'Steps are not current. Recalculate the selected paw first.', 'Error');

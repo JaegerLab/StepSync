@@ -81,8 +81,8 @@ classdef SessionData < handle
         function frameRate = getFrameRate(obj)
             frameRate = obj.frameRate;
             if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
-            if obj.has('emg') && isfield(obj.emg, 'trigger') && ...
-                    isfield(obj.emg.trigger, 'freq')
+            % the trigger counts even when all EMG data was deleted
+            if isfield(obj.emg, 'trigger') && isfield(obj.emg.trigger, 'freq')
                 frameRate = obj.emg.trigger.freq;
                 if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
             end
@@ -95,7 +95,7 @@ classdef SessionData < handle
 
         function t = getFrameTimes(obj, nFrames)
             triggers = [];
-            if obj.has('emg') && isfield(obj.emg, 'trigger') && ...
+            if isfield(obj.emg, 'trigger') && ...
                     isfield(obj.emg.trigger, 'time') && numel(obj.emg.trigger.time) >= 2
                 triggers = obj.emg.trigger.time;
             end
@@ -138,9 +138,8 @@ classdef SessionData < handle
                         tf = true;
                     end
                 case 'emg'
-                    if ~isempty(obj.emg) && isfield(obj.emg, 'analog_data') && ~isempty(obj.emg.analog_data)
-                        tf = true;
-                    end
+                    % raw or any processed data; metadata alone does not count
+                    tf = ~isempty(obj.emg) && ~isempty(EMG.emg_types(obj.emg));
                 case 'dlc'
                     if ~isempty(obj.dlc) && isfield(obj.dlc, 'table') && ~isempty(obj.dlc.table)
                         tf = true;

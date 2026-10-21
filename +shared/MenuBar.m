@@ -9,7 +9,10 @@ classdef MenuBar < handle
 %                     (default true)
 %
 %   File:   <fileItems> | Load session, Save session, Export to Workspace | Close, Exit all
-%   Window: Video, EMG, DLC, Gait (open sub-windows listed below their module) | Bring All to Front
+%   Window: Video, EMG, DLC, Gait (open sub-windows listed below their module) | Open All, Bring All to Front
+%
+% Shortcuts: Ctrl+O Open, Ctrl+S Save, Ctrl+W Close, Ctrl+V Video, Ctrl+E EMG,
+% Ctrl+D DLC, Ctrl+G Gait, Ctrl+A Open All.
 %
 % The object lives as long as its window and rebuilds the Window menu on
 % WindowsChanged. It does not need to be stored.
@@ -30,10 +33,13 @@ classdef MenuBar < handle
             obj.Figure = fig;
 
             fileMenu = uimenu(fig, 'Text', 'File');
+            shortcuts = {'Open', 'O'; 'Save', 'S'};
             for k = 1:size(fileItems, 1)
                 callback = fileItems{k,2};
                 item = uimenu(fileMenu, 'Text', fileItems{k,1}, 'Enable', onOff(~isempty(callback)));
                 if ~isempty(callback), item.MenuSelectedFcn = callback; end
+                key = shortcuts(strcmp(shortcuts(:,1), fileItems{k,1}), 2);
+                if ~isempty(key), item.Accelerator = key{1}; end
             end
             uimenu(fileMenu, 'Text', 'Load session', 'Separator', 'on', ...
                 'MenuSelectedFcn', @(~,~)shared.load_session(fig));
@@ -41,7 +47,7 @@ classdef MenuBar < handle
                 'MenuSelectedFcn', @(~,~)shared.save_session(fig));
             uimenu(fileMenu, 'Text', 'Export to Workspace', 'Enable', onOff(sessionEnabled), ...
                 'MenuSelectedFcn', @(~,~)shared.export2base(fig));
-            uimenu(fileMenu, 'Text', 'Close', 'Separator', 'on', ...
+            uimenu(fileMenu, 'Text', 'Close', 'Separator', 'on', 'Accelerator', 'W', ...
                 'MenuSelectedFcn', @(~,~)close(fig));
             uimenu(fileMenu, 'Text', 'Exit all', ...
                 'MenuSelectedFcn', @(~,~)shared.exit_all(true, fig));
@@ -65,20 +71,30 @@ classdef MenuBar < handle
             windows = shared.open_windows();
             modules = {'video', 'emg', 'dlc', 'gait'};
             labels  = {'Video', 'EMG', 'DLC', 'Gait'};
+            keys    = {'V', 'E', 'D', 'G'};
             indent = repmat(char(160), 1, 4);   % plain spaces are trimmed
             for k = 1:numel(modules)
                 module = modules{k};
                 mine = windows(strcmp({windows.module}, module));
                 uimenu(obj.WindowMenu, 'Text', labels{k}, 'Checked', onOff(~isempty(mine)), ...
-                    'MenuSelectedFcn', @(~,~)shared.open_module(module));
+                    'Accelerator', keys{k}, 'MenuSelectedFcn', @(~,~)shared.open_module(module));
                 for sub = mine([mine.isSub])
                     uimenu(obj.WindowMenu, 'Text', [indent sub.fig.Name], 'Checked', 'on', ...
                         'MenuSelectedFcn', @(~,~)figure(sub.fig));
                 end
             end
-            uimenu(obj.WindowMenu, 'Text', 'Bring All to Front', 'Separator', 'on', ...
+            uimenu(obj.WindowMenu, 'Text', 'Open All', 'Separator', 'on', 'Accelerator', 'A', ...
+                'MenuSelectedFcn', @(~,~)openAll(modules));
+            uimenu(obj.WindowMenu, 'Text', 'Bring All to Front', ...
                 'MenuSelectedFcn', @(~,~)shared.bring_all_to_front(obj.Figure));
         end
+    end
+end
+
+% open every module window; open ones come to the front
+function openAll(modules)
+    for k = 1:numel(modules)
+        shared.open_module(modules{k});
     end
 end
 

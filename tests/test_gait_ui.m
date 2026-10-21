@@ -138,8 +138,13 @@ gaitFig = shared.open_module('gait');
 verifyEqual(testCase,shared.open_module('dlc'),dlcFig);   % no second window
 windowMenu = findall(gaitFig,'Type','uimenu','Text','Window');
 items = flip(windowMenu.Children);
-verifyEqual(testCase,{items.Text},{'Video','EMG','DLC','Gait','Bring All to Front'});
+verifyEqual(testCase,{items.Text},{'Video','EMG','DLC','Gait','Open All','Bring All to Front'});
 verifyEqual(testCase,logical([items(1:4).Checked]),[false false true true]);
+verifyEqual(testCase,{items(1:5).Accelerator},{'V','E','D','G','A'});
+fileMenu = findall(gaitFig,'Type','uimenu','Text','File');
+fileItems = flip(fileMenu.Children);
+shortcuts = containers.Map({fileItems.Text},{fileItems.Accelerator});
+verifyEqual(testCase,{shortcuts('Open'),shortcuts('Save'),shortcuts('Close')},{'O','S','W'});
 % a sub-window is listed, checked, below its module, and removed when closed
 S.gait.hd.maskFig = uifigure('Name','Edit Mask');
 notify(S,'WindowsChanged');
@@ -148,11 +153,17 @@ verifyEqual(testCase,strtrim(strrep(items(5).Text,char(160),' ')),'Edit Mask');
 verifyTrue(testCase,logical(items(5).Checked));
 delete(S.gait.hd.maskFig);
 notify(S,'WindowsChanged');
-verifyNumElements(testCase,windowMenu.Children,5);
+verifyNumElements(testCase,windowMenu.Children,6);
+% Open All opens the missing modules and keeps the open ones
+openAll = findall(windowMenu,'Text','Open All');
+callback = openAll.MenuSelectedFcn; callback(openAll,[]);
+verifyEqual(testCase,sort(fieldnames(S.fig))',{'dlc','emg','gait','video'});
+verifyEqual(testCase,S.fig.dlc,dlcFig);
 % Exit all closes everything and resets the session
 S.frameRate = 30;
 shared.exit_all(false);
 verifyFalse(testCase,isvalid(S));
 verifyFalse(testCase,isgraphics(dlcFig) || isgraphics(gaitFig));
+verifyEmpty(testCase,findall(groot,'Type','figure','Name','Video Viewer'));
 verifyEqual(testCase,shared.SessionData.instance().frameRate,0);
 end

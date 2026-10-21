@@ -51,6 +51,9 @@ Manual checks of the menu bar and windows:
   visible, title bar (and the STA menu bar) included.
 - Titles show the opened file, also after Load session; file dialogs start in
   the folder of the last file opened.
+- Shortcuts in every window with a menu: Ctrl+O Open, Ctrl+S Save, Ctrl+W
+  Close, Ctrl+V/E/D/G open or raise Video/EMG/DLC/Gait, Ctrl+A Open All.
+  Check that Ctrl+V and Ctrl+A still paste and select text in edit fields.
 
 Manual checks with representative recordings are still required:
 

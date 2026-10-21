@@ -26,10 +26,17 @@ classdef SessionData < handle
         WindowsChanged      % a module window or sub-window opened or closed
     end
 
+    properties (Access = private)
+        warningState   % restored when the session ends
+    end
+
     methods (Access = private)
         % hide constructor as private to avoid creating multiple instances
         function obj = SessionData()
-            % Private constructor
+            % Turn off the "ButtonDownFcn" warning when selecting axes tools,
+            % for as long as the session lives: it ends with Exit all or when
+            % the last module window closes, not when one of several closes.
+            obj.warningState = warning('off', 'MATLAB:modes:mode:InvalidPropertySet');
         end
     end
 
@@ -45,6 +52,10 @@ classdef SessionData < handle
     end
 
     methods
+        function delete(obj)
+            if ~isempty(obj.warningState), warning(obj.warningState); end
+        end
+
         function setTime(obj, t)
             if obj.currentTime ~= t
                 obj.currentTime = t;

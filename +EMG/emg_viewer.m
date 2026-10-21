@@ -376,6 +376,7 @@ function fig = emg_viewer()
     function refresh(~,~)
         if ~data.has('emg'), return; end
         data.setZoom([0 data.emg.t(end)]);
+        ylim(data.emg.hd.ax, 'auto');   % also undo vertical zoom
 
         updateInfo();
     end

@@ -44,6 +44,30 @@ verifyFalse(testCase, isvalid(S));
 verifyEqual(testCase, shared.SessionData.instance().frameRate, 0);
 end
 
+function testToolWarningStaysOffUntilLastModuleCloses(testCase)
+S = shared.SessionData.instance();
+assumeTrue(testCase, isempty(fieldnames(S.fig)), 'Close StepSync before running this test.');
+id = 'MATLAB:modes:mode:InvalidPropertySet';
+delete(S);   % the next session starts from the state set here
+old = warning('query', id);
+restore = onCleanup(@()warning(old));
+warning('on', id);
+S = shared.SessionData.instance();
+verifyEqual(testCase, warning('query', id).state, 'off');
+% another module window still open: closing one keeps the session and the warning off
+other = figure('Visible', 'off');
+closeOther = onCleanup(@()delete(other));
+S.fig(1).gait = other;
+S.moduleClosed();
+verifyTrue(testCase, isvalid(S));
+verifyEqual(testCase, warning('query', id).state, 'off');
+% last one closed: the session ends and the warning is back
+delete(other);
+S.moduleClosed();
+verifyFalse(testCase, isvalid(S));
+verifyEqual(testCase, warning('query', id).state, 'on');
+end
+
 function testRememberPathKeepsFolder(testCase)
 S = shared.SessionData.instance();
 S.rememberPath(fullfile(tempdir, 'missing_file.csv'));

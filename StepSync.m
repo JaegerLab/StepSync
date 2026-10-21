@@ -23,13 +23,9 @@ function hfig = StepSync(default_path)
     end
 
     fig = uifigure('Name', 'StepSync', 'Position', [100 100 400 200], ...
-        'Tag', shared.MenuBar.LauncherTag);
+        'Tag', shared.MenuBar.LauncherTag, 'CloseRequestFcn', @onLauncherClose);
     shared.MenuBar(fig, {'Open', []; 'Save', []}, false);
     if nargout == 1, hfig = fig; end
-
-    % turn off "ButtonDownFcn" warning when selecting tools
-    s = warning('off', 'MATLAB:modes:mode:InvalidPropertySet');
-    cleanup = onCleanup(@() warning(s)); % restore warning after quitting
 
     % Data Launcher Buttons
     grid1 = uigridlayout(fig, [2 2], 'Padding', [20 20 20 20]);
@@ -37,4 +33,13 @@ function hfig = StepSync(default_path)
     uibutton(grid1, 'Text', 'EMG', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
     uibutton(grid1, 'Text', 'DLC', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
     uibutton(grid1, 'Text', 'Gait', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
+end
+
+% Closed by the user (opening a module deletes the launcher without this):
+% with no module window open, end the session as Exit all does.
+function onLauncherClose(src, ~)
+    delete(src);
+    if isempty(shared.open_windows())
+        delete(shared.SessionData.instance());
+    end
 end

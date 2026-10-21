@@ -578,6 +578,7 @@ function fig = dlc_viewer()
         if ~data.has('dlc'), return; end
         finiteTime = data.dlc.t(isfinite(data.dlc.t));
         if numel(finiteTime)>1, data.setZoom(finiteTime([1 end])); end
+        ylim(data.dlc.hd.ax, 'auto');   % also undo vertical zoom
 
         updateInfo();
     end

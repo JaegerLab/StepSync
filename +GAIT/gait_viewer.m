@@ -480,6 +480,7 @@ function fig = gait_viewer()
         if ~data.has('gait'), return; end
         t = data.gait.t(isfinite(data.gait.t));
         if numel(t)>1, data.setZoom(t([1 end])); end
+        ylim(data.gait.hd.ax, 'auto');   % also undo vertical zoom
 
         updateInfo();
     end

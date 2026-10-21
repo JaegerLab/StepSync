@@ -136,12 +136,12 @@ dlcFig = shared.open_module('DLC');
 verifyFalse(testCase,isgraphics(launcher));   % opening a module closes the launcher
 gaitFig = shared.open_module('gait');
 verifyEqual(testCase,shared.open_module('dlc'),dlcFig);   % no second window
-windowMenu = findall(gaitFig,'Type','uimenu','Text','Window');
+windowMenu = findall(gaitFig,'Type','uimenu','Tag','Window');
 items = flip(windowMenu.Children);
 verifyEqual(testCase,{items.Text},{'Video','EMG','DLC','Gait','Open All','Bring All to Front'});
 verifyEqual(testCase,logical([items(1:4).Checked]),[false false true true]);
 verifyEqual(testCase,{items(1:5).Accelerator},{'V','E','D','G','A'});
-fileMenu = findall(gaitFig,'Type','uimenu','Text','File');
+fileMenu = findall(gaitFig,'Type','uimenu','Tag','File');
 fileItems = flip(fileMenu.Children);
 shortcuts = containers.Map({fileItems.Text},{fileItems.Accelerator});
 verifyEqual(testCase,{shortcuts('Open'),shortcuts('Save'),shortcuts('Close')},{'O','S','W'});

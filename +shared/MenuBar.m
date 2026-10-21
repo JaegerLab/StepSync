@@ -32,7 +32,9 @@ classdef MenuBar < handle
             if nargin < 3, sessionEnabled = true; end
             obj.Figure = fig;
 
-            fileMenu = uimenu(fig, 'Text', 'File');
+            % headers padded with non-breaking spaces (plain ones are trimmed)
+            % for wider headers; the Tag names the menu
+            fileMenu = uimenu(fig, 'Text', ['File' repmat(char(160), 1, 6)], 'Tag', 'File');
             shortcuts = {'Open', 'O'; 'Save', 'S'};
             for k = 1:size(fileItems, 1)
                 callback = fileItems{k,2};
@@ -52,7 +54,7 @@ classdef MenuBar < handle
             uimenu(fileMenu, 'Text', 'Exit all', ...
                 'MenuSelectedFcn', @(~,~)shared.exit_all(true, fig));
 
-            obj.WindowMenu = uimenu(fig, 'Text', 'Window');
+            obj.WindowMenu = uimenu(fig, 'Text', ['Window' repmat(char(160), 1, 4)], 'Tag', 'Window');
             obj.rebuildWindowMenu();
             obj.Listener = listener(shared.SessionData.instance(), 'WindowsChanged', ...
                 @(~,~)obj.rebuildWindowMenu());

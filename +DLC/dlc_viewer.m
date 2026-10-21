@@ -8,7 +8,7 @@ function fig = dlc_viewer()
         fig = uifigure('Name', 'DLC Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn', @onClose);
         data.fig(1).dlc = fig;
-        shared.MenuBar(fig, {'Open', @openDLC; 'Save', []});
+        shared.MenuBar(fig, {'Open', @openDLC; 'Save', @saveDLC});
         drawnow
         grid1 = uigridlayout(fig, [3 2]);
         grid1.Padding = [20,20,20,20];
@@ -91,9 +91,10 @@ function fig = dlc_viewer()
         data.rememberPath(filename);
 
         % This reading function handles different kinds of data formats
-        tabledlc = DLC.read_dlc(filename);
+        tabledlc = DLC.align_to_video(DLC.read_dlc(filename), fig);
         data.dlc.table = tabledlc;
-        data.dlc.filename = filename;
+        data.dlc.filename = filename;      % shown in the title; the last saved file
+        data.dlc.source_file = filename;   % Save may not overwrite it
         data.dlc.seg = [];
         data.dlc.seg_bodypart = '';
 
@@ -113,6 +114,42 @@ function fig = dlc_viewer()
         updateDLCtime(data.currentTime);
         % draw trajectory plot
         data.notifyDLC('open', tabledlc.Properties.UserData);
+    end
+
+    % Save committed body parts as a DLC csv; uncommitted fix previews
+    % (temp_*) are left out by DLC.save_csv.
+    function saveDLC(~,~)
+        if ~data.has('dlc')
+            uialert(fig, 'There is no DLC data to save.', 'Save');
+            return;
+        end
+        [range, ok] = shared.ask_save_range(fig, 'DLC');
+        if ~ok, return; end
+        original = data.dlc.filename;
+        if isfield(data.dlc, 'source_file'), original = data.dlc.source_file; end
+        [folder, base] = fileparts(original);
+        if ~isempty(data.defaultPath), folder = data.defaultPath; end
+        [file, path] = uiputfile('*.csv', 'Save DLC', fullfile(folder, [base '_StepSync.csv']));
+        drawnow; figure(fig);
+        if isequal(file, 0), return; end
+        filename = fullfile(path, file);
+        if strcmpi(filename, original)
+            uialert(fig, sprintf('%s is the file this DLC data was opened from. Choose another name.', file), ...
+                'Save refused');
+            return;
+        end
+        tabledlc = data.dlc.table;
+        if ~isempty(range)
+            tabledlc = DLC.crop_table(tabledlc, data.dlc.t, range);
+            if height(tabledlc) == 0
+                uialert(fig, 'No frames lie in the zoom window.', 'Save');
+                return;
+            end
+        end
+        DLC.save_csv(filename, tabledlc);
+        data.rememberPath(filename);
+        data.dlc.filename = filename;   % the title shows the saved file
+        fig.Name = ['DLC Viewer: ' filename];
     end
 
     function listChanged()

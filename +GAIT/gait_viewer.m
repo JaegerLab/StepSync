@@ -12,7 +12,7 @@ function fig = gait_viewer()
         fig = uifigure('Name', 'Gait Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn',@onClose);
         data.fig(1).gait = fig;
-        shared.MenuBar(fig, {'Open', []; 'Import DLC', @importPaws; 'Save', []});
+        shared.MenuBar(fig, {'Open', @openGait; 'Import DLC', @importPaws; 'Save', @saveGait});
         drawnow
         grid1 = uigridlayout(fig, Padding = [20,20,20,20], ...
             ColumnWidth = {'1x', 140}, RowHeight = {30, '1x', 30});
@@ -99,7 +99,7 @@ function fig = gait_viewer()
             if ~exist(filename, "file"), return; end
             data.rememberPath(filename);
 
-            table_dlc = DLC.read_dlc(filename);
+            table_dlc = DLC.align_to_video(DLC.read_dlc(filename), fig);
             part_list = table_dlc.Properties.UserData;
             dlcFile = filename;
             source = filename;
@@ -155,11 +155,115 @@ function fig = gait_viewer()
         updateTitle();
     end
 
-    % The title shows the DLC file the paws were imported from.
+    % The title shows the gait file last opened or saved, otherwise the DLC
+    % file the paws were imported from.
     function updateTitle()
         fig.Name = 'Gait Viewer';
-        if data.has('gait') && isfield(data.gait, 'filename') && ~isempty(data.gait.filename)
-            fig.Name = ['Gait Viewer: ' data.gait.filename];
+        if ~data.has('gait'), return; end
+        shown = '';
+        if isfield(data.gait, 'filename'), shown = data.gait.filename; end
+        if isfield(data.gait, 'display_name'), shown = data.gait.display_name; end
+        if ~isempty(shown), fig.Name = ['Gait Viewer: ' shown]; end
+    end
+
+    %% === Save and Open gait files (GAIT.save_gait / GAIT.read_gait) ===
+    function saveGait(~,~)
+        if ~data.has('gait')
+            uialert(fig, 'There is no gait data to save.', 'Save');
+            return;
+        end
+        [range, ok] = shared.ask_save_range(fig, 'Gait');
+        if ~ok, return; end
+        if ~isfield(data.gait, 'filename'), data.gait.filename = ''; end
+        base = 'gait';
+        if ~isempty(data.gait.filename), [~, base] = fileparts(data.gait.filename); end
+        [file, path] = uiputfile('*.mat', 'Save gait', fullfile(data.defaultPath, [base '_gait.mat']));
+        drawnow; figure(fig);
+        if isequal(file, 0), return; end
+        filename = fullfile(path, file);
+        % never overwrite the DLC input or the gait file opened
+        originals = {data.gait.filename};
+        if isfield(data.gait, 'source_file'), originals{end+1} = data.gait.source_file; end
+        if any(strcmpi(filename, originals))
+            uialert(fig, sprintf('%s is a file this gait data was read from. Choose another name.', file), ...
+                'Save refused');
+            return;
+        end
+        hd = data.gait.hd;
+        syncSelection();
+        settings = struct('resolution', hd.resolution.Value, 'minInterval', hd.minTimeInterval.Value);
+        GAIT.save_gait(filename, data.gait, settings, data.getFrameRate(), range);
+        data.rememberPath(filename);
+        data.gait.display_name = filename;
+        updateTitle();
+    end
+
+    % Replace the gait data with a saved file and recalculate.
+    function openGait(~,~)
+        [file, path] = uigetfile(fullfile(data.defaultPath, '*.mat'), 'Open gait file');
+        drawnow; figure(fig);
+        if isequal(file, 0), return; end
+        filename = fullfile(path, file);
+        try
+            g = GAIT.read_gait(filename);
+        catch ME
+            uialert(fig, ME.message, 'Open gait file');
+            return;
+        end
+        data.rememberPath(filename);
+
+        hd = data.gait.hd;
+        for field = {'maskFig','sta_GUI'}
+            if isfield(hd, field{1}) && isgraphics(hd.(field{1})), close(hd.(field{1})); end
+        end
+        invalidateSteps();
+        % Follow DLC edits again only if the DLC viewer has the same file open.
+        source = g.source;
+        if strcmp(source, 'dlc_module')
+            dlcFiles = {};
+            if data.has('dlc') && isfield(data.dlc, 'filename'), dlcFiles{end+1} = data.dlc.filename; end
+            if data.has('dlc') && isfield(data.dlc, 'source_file'), dlcFiles{end+1} = data.dlc.source_file; end
+            if isempty(g.filename) || ~any(strcmpi(g.filename, dlcFiles)), source = filename; end
+        end
+        data.gait = struct('hd', hd);
+        data.gait.source = source;
+        data.gait.filename = g.filename;
+        data.gait.display_name = filename;
+        data.gait.source_file = filename;
+        data.gait.mask = g.mask;
+        if ~isempty(g.maskParam), data.gait.maskParam = g.maskParam; end
+        if isfield(g, 'sta') && ~isempty(g.sta), data.gait.sta = g.sta; end
+        dlcPromptPending = false;
+        data.gait.paw = g.paw;
+
+        % widgets
+        traces = struct('x', 'X', 'y', 'Y', 'speed', 'Speed');
+        hd.pawList.Items = {g.paw.name};
+        hd.pawList.ItemsData = 1:numel(g.paw);
+        hd.pawList.Value = g.selection.paw;
+        hd.pawList.Enable = 'on';
+        hd.trace.Value = traces.(g.selection.trace);
+        hd.resolution.Value = g.resolution;
+        hd.minTimeInterval.Value = g.minInterval;
+        hd.stepList.Items = {'rising','falling','onset','offset','peak','valley'};
+        hd.stepList.ItemsData = hd.stepList.Items;
+        hd.stepList.Value = g.selection.step;
+        hd.stepList.Enable = 'on';
+        hd.stepCheck.Value = g.selection.show;
+        hd.stepCheck.Enable = 'on';
+        hd.sta.Enable = 'on';
+
+        getSpeeds();
+        plotTrace();
+        getSteps();
+        plotSteps();
+        updateTitle();
+
+        rate = data.getFrameRate();
+        if abs(rate - g.frameRate) > 1e-6 * max(1, g.frameRate)
+            uialert(fig, sprintf(['The gait data was saved at %.4g Hz; the current frame rate is ' ...
+                '%.4g Hz. Speeds and step times use the current rate.'], g.frameRate, rate), ...
+                'Frame rate differs', 'Icon', 'warning');
         end
     end
 

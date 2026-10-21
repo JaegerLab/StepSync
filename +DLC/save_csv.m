@@ -26,7 +26,13 @@ for k = 1:numel(parts)
     headers(2,cols+1) = repmat({part},1,3);
     headers(3,cols+1) = {'x','y','likelihood'};
 end
+% index column: zero-based frame numbers (kept by DLC.crop_table)
+frames = (1:height(tabledlc))';
+if isprop(tabledlc.Properties.CustomProperties,'FrameIndex') && ...
+        numel(tabledlc.Properties.CustomProperties.FrameIndex) == height(tabledlc)
+    frames = tabledlc.Properties.CustomProperties.FrameIndex(:);
+end
 writecell(headers,filename,'Delimiter',',');
-writematrix([(0:height(tabledlc)-1)' values],filename,'WriteMode','append','Delimiter',',');
+writematrix([frames-1 values],filename,'WriteMode','append','Delimiter',',');
 feedback = 1;
 end

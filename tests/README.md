@@ -27,7 +27,11 @@ other files, older and newer formats are rejected. `test_emg` covers the EMG
 data types (Raw, Processed 1..N, renumbering after delete, `has('emg')` with
 processed data only, frame timing from the trigger without data), the EMG
 `.mat` file (selected types, processed-only loading, rejected files) and the
-achieved sample rate after down sampling.
+achieved sample rate after down sampling. `test_files` covers DLC csv frame
+numbers (a zoom-window save keeps the original frame numbers; on open a
+cropped file is shifted to 1 when the video has the same number of frames,
+otherwise padded with NaN) and the gait `.mat` file (round trip, zoom window
+as NaN plus mask, rejected files).
 
 Close StepSync before running the desktop integration test:
 
@@ -65,7 +69,7 @@ Manual checks of the menu bar and windows:
   the folder of the last file opened.
 - Shortcuts in every window with a menu: Ctrl+O Open, Ctrl+S Save, Ctrl+W
   Close, Ctrl+I/E/D/G open or raise Video/EMG/DLC/Gait, Ctrl+A Open All,
-  Ctrl+T Bring All to Top.
+  Ctrl+T Bring All to Top.
 
 Manual checks with representative recordings are still required:
 
@@ -95,6 +99,21 @@ Manual checks of EMG:
   check plots, channel map/sort, STA and zoom without raw data.
 - Without open-ephys-matlab-tools on the path, opening an Open Ephys folder
   prints a message, shows a message box with the install link, and stops.
+
+Manual checks of DLC and Gait files:
+
+- DLC Save, full length and zoom window: the title switches to the saved
+  file; choosing the file it was opened from is refused; a fix preview that
+  was not committed is not in the file.
+- Open the zoom-window csv with the full video open: an info alert says it
+  was padded, and markers match the video at known frames. With a video
+  cropped to the same frames it is shifted instead.
+- Gait Save, then Open in a new session: paws, trace, step type, thresholds,
+  resolution, min interval, mask and STA history come back; steps match.
+  A zoom-window save shows only that part, the rest masked.
+- Gait Open with a different frame rate warns. A gait file imported from the
+  DLC viewer follows DLC edits after Open only if the DLC viewer has the
+  same file open.
 - Preview a pose correction, switch body part/settings and Save As; check source identity.
 
 Validation performed in the editing environment: MISS_HIT parsed all 38 MATLAB

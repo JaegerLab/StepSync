@@ -1,6 +1,17 @@
 function steps = detect_steps(trace, mask, threshold, minInterval, nearZero)
 %DETECT_STEPS Calculate one paw/trace; indices always refer to original frames.
-% steps = detect_steps(trace, mask, threshold, minInterval)
+% steps = GAIT.detect_steps(trace, mask, threshold, minInterval)
+% steps = GAIT.detect_steps(trace, mask, threshold, minInterval, nearZero)
+%
+%  trace:       paw x, y or speed, one value per frame
+%  mask:        logical, false for excluded frames
+%  threshold:   threshold, in the units of trace
+%  minInterval: minimum distance between events (frames); also the search
+%               range for onset/offset
+%  nearZero:    rest level for onset/offset (default NaN: none found)
+% steps: struct of frame indices: rising, falling, onset, offset, peak,
+%        valley, masked (first frame of each masked period).
+% See docs/functions.md.
 
 if nargin<5, nearZero = NaN; end
 trace = trace(:);

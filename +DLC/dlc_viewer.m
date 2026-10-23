@@ -54,9 +54,13 @@ function fig = dlc_viewer()
         hold(hd.ax, 'on');
         hd.ax.ButtonDownFcn = @axClicked;   % clicks on blank space
 
-        hd.list_bodyparts = uilistbox(grid1, 'Multiselect', 'off', ...
-            'Enable','off', 'ValueChangedFcn', @(src,evt)listChanged());
-        hd.list_bodyparts.Layout.Row = 2; hd.list_bodyparts.Layout.Column = 2;
+        subgrid3 = uigridlayout(grid1, [2 1], 'Padding', [0 0 0 0], ...
+            'RowHeight', {'1x', 30});
+        subgrid3.Layout.Row = 2; subgrid3.Layout.Column = 2;
+            hd.list_bodyparts = uilistbox(subgrid3, 'Multiselect', 'off', ...
+                'Enable','off', 'ValueChangedFcn', @(src,evt)listChanged());
+            hd.deleteBodypart = uibutton(subgrid3, 'Text', 'Delete bodypart', ...
+                'Enable', 'off', 'ButtonPushedFcn', @deleteBodypart);
 
         %% Row 3:  zoom in, zoom out, update buttons
         subgrid2 = uigridlayout(grid1, [1 4], 'Padding', [0 0 0 0]);
@@ -101,6 +105,7 @@ function fig = dlc_viewer()
         % update body part list
         hd.list_bodyparts.Enable = 'on';
         hd.list_bodyparts.Items = tabledlc.Properties.UserData;
+        hd.deleteBodypart.Enable = 'on';
 
         % axis(hd.ax,'tight');
         % ylim(hd.ax, [0 1200]);
@@ -156,12 +161,47 @@ function fig = dlc_viewer()
         data.notifyDLC('selection');
     end
 
+    % Delete the selected body part from the table (and its fix preview).
+    function deleteBodypart(~,~)
+        if ~data.has('dlc'), return; end
+        hd = data.dlc.hd;
+        bodypart = hd.list_bodyparts.Value;
+        items = hd.list_bodyparts.Items;
+        if numel(items) < 2
+            uialert(fig, 'The only body part cannot be deleted.', 'Delete bodypart');
+            return;
+        end
+        answer = uiconfirm(fig, sprintf('Delete %s?', bodypart), 'Delete bodypart', ...
+            'Options', {'Delete', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2, ...
+            'Icon', 'warning', 'Interpreter', 'none');
+        if ~strcmp(answer, 'Delete'), return; end
+
+        if isfield(data.dlc, 'seg_bodypart') && strcmp(data.dlc.seg_bodypart, bodypart)
+            temp = intersect({'temp_x', 'temp_y', 'temp_likelihood'}, ...
+                data.dlc.table.Properties.VariableNames);
+            data.dlc.table = removevars(data.dlc.table, temp);
+            data.dlc.seg = [];
+            data.dlc.seg_bodypart = '';
+        end
+        cols = intersect(strcat(bodypart, {'_x', '_y', '_likelihood'}), ...
+            data.dlc.table.Properties.VariableNames);
+        data.dlc.table = removevars(data.dlc.table, cols);
+        names = data.dlc.table.Properties.UserData;
+        data.dlc.table.Properties.UserData = names(~strcmp(names, bodypart));
+
+        idx = find(strcmp(items, bodypart));
+        items(idx) = [];
+        hd.list_bodyparts.Items = items;
+        hd.list_bodyparts.Value = items{min(idx, end)};
+        data.notifyDLC('delete', {bodypart});
+    end
+
     % main update function.=========================
     function showBodypart()
         if ~data.has('dlc'); return; end
 
         hd = data.dlc.hd;
-        S = fixStyle();
+        S = DLC.fix_style();
         
         bodypart = hd.list_bodyparts.Value;
 
@@ -272,7 +312,7 @@ function fig = dlc_viewer()
     % the same DisplayName): use the x copy, or the y copy when x is hidden.
     % Hidden or empty layers are left out.
     function updateLegend(hd)
-        S = fixStyle();
+        S = DLC.fix_style();
         h = gobjects(0);
         for f = {'xplot', 'yplot', 'pplot'}
             if isfield(hd, f{1}) && isgraphics(hd.(f{1})) && isOn(hd.(f{1}))
@@ -535,7 +575,7 @@ function fig = dlc_viewer()
         % recheck only around the edit
         xdata = data.dlc.table.([bodypart '_x']);
         ydata = data.dlc.table.([bodypart '_y']);
-        [tempX, tempY, mask, seg] = DLC.dlc_fix_predict(xdata, ydata, [], [], seg);
+        [tempX, tempY, mask, seg] = DLC.dlc_fix(xdata, ydata, [], [], seg);
 
         data.dlc.table.temp_x = tempX;
         data.dlc.table.temp_y = tempY;
@@ -546,7 +586,7 @@ function fig = dlc_viewer()
 
     % frame at such that the clicked jump lies between frames a and a+1
     function a = jumpAtClick(src, tc, t, seg, hd)
-        S = fixStyle();
+        S = DLC.fix_style();
         isJumpLine = isprop(src, 'Tag') && startsWith(src.Tag, 'fix_jump');
         xl = xlim(hd.ax);
         tol = S.snapPx * diff(xl) / max(1, hd.ax.InnerPosition(3));
@@ -671,83 +711,6 @@ end
 % ==========================================================================
 % local helpers (no shared state)
 % ==========================================================================
-function S = fixStyle()
-% All display choices and attention thresholds of the fix overlay.
-% Magenta is reserved for gait markers; yellow is avoided (invisible on white).
-C.blueDark  = [0.00 0.24 0.62];
-C.blueLight = [0.35 0.66 1.00];
-C.blueGrey  = [0.66 0.80 1.00];
-C.green     = [0.10 0.62 0.15];
-C.red       = [0.85 0.10 0.10];
-C.orange    = [1.00 0.50 0.00];
-C.grey      = [0.55 0.55 0.55];
-C.yellow    = [0.90 0.80 0.00];
-
-% traces
-S.xColor = C.blueDark;          % x trace
-S.yColor = C.blueLight;         % y trace
-S.pColor = C.yellow;          % p trace
-S.leftAxisColor = [0.15 0.15 0.15];   % MATLAB default; yyaxis would recolour it
-S.trace  = 1;                   % trace line width
-
-% interpolation (behind the trace)
-S.interpColor = C.green;
-S.interpStyle = ':';
-S.interpWidth = 1;
-
-% jumps (on top of the trace)
-S.jumpColor = C.orange;
-S.jumpStyle = '--';
-S.jumpWidth = S.trace;
-
-% frame markers; seeds made by the algorithm are not marked
-S.good  = C.green;
-S.bad   = C.red;
-S.grey  = C.grey;
-S.markSize  = 6;                % same for all frame markers
-S.markWidth = 1;                % one step thicker than the default 0.5
-S.goodMarker     = 'o';         % propagated good: open circle
-S.userGoodMarker = 'o';         % user-made seed: filled circle
-S.badMarker      = 'x';         % propagated bad
-S.questMarker    = 'x';         % questionable (grey)
-S.userBadMarker  = '*';         % user-made bad (user)
-S.unflagMarker   = 'o';         % never reached (grey)
-
-% needs attention: large circles at both ends
-S.attnMarker   = '^';
-S.attnSize     = 14;
-S.attnWidth    = 1.5;
-S.attnConflict = C.orange;      % neighbouring good segments
-S.attnLongBad  = C.red;         % bad segment of at least longBadFrac * win_width
-S.attnInterp   = C.green;       % interpolation of at least longInterpFrac * win_width
-S.longBadFrac    = 1/3;
-S.longInterpFrac = 1;
-
-% legend: order of the fix layers, and placement ('eastoutside' keeps it off the data)
-S.legendOrder = {'interp', 'jump', 'good', 'bad', 'userGood', ...
-                 'userBad', 'unflag', 'quest', 'attnConflict', 'attnLongBad', 'attnInterp'};
-S.legendLocation = 'southeast';
-
-% Displaynames for legends
-S.legend.x = 'X';
-S.legend.y = 'Y';
-S.legend.p = 'P';
-S.legend.interp = 'Interpolation';
-S.legend.jump = 'Jump';
-S.legend.good = 'Presumed good';
-S.legend.bad = 'Presumed bad';
-S.legend.quest = 'Questionable';
-S.legend.unflag = 'Undetermined';
-S.legend.userGood = 'User confirmed';
-S.legend.userBad = 'User rejected';
-S.legend.attnConflict = 'Attn: adjacent good';
-S.legend.attnLongBad = 'Attn: long bad';
-S.legend.attnInterp = 'Attn: long interp';
-
-% clicks
-S.snapPx = 6;                   % ctrl-click snaps to a jump within this many pixels
-end
-
 function tf = isOn(h)
 % Visible is 'on'/'off' or an OnOffSwitchState depending on MATLAB version
 tf = strcmp(char(h.Visible), 'on');

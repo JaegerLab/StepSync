@@ -42,7 +42,7 @@ If no camera trigger is available, frame *k* is placed at *k* / frame rate
 seconds, so frame 1 is at 1/frame rate, not 0. The frame rate is taken from
 the first available of:
 
-1. a rate typed into the **FrameRate** box of the Video or DLC viewer;
+1. a rate typed into the frame rate box of the Video, DLC or Gait viewer;
 2. the TTL frequency (1 / median interval between pulses);
 3. the frame rate stored in the video file;
 4. 1 Hz. In this case the DLC viewer labels its axis "Frame" rather than

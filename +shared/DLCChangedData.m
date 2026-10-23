@@ -4,6 +4,7 @@ classdef DLCChangedData < event.EventData
 %       'open'      a new DLC file replaced the table (all body parts changed)
 %       'edit'      committed coordinates of existing body parts were edited
 %       'commit'    a fix was committed as a body part (new or overwritten)
+%       'delete'    a body part was deleted
 %       'preview'   only temporary fix-preview columns changed
 %       'selection' the selected body part changed; the data did not
 %       'close'     the DLC viewer closed and its data was cleared

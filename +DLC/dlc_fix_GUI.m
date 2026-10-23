@@ -39,11 +39,23 @@ function fig = dlc_fix_GUI(mousePos)
 
     function preview()
         if ~data.has('dlc'), return; end
+
+        if ismember('temp_x', data.dlc.table.Properties.VariableNames)
+            if isfield(data.dlc, 'seg_bodypart')
+                msg = sprintf(' for %s', data.dlc.seg_bodypart);
+            else 
+                msg = '';
+            end
+            msg = sprintf('Discard the previous preview%s?', msg);
+            selection = uiconfirm(fig, msg, 'Confirm Discard');
+            if strcmp(selection, 'Cancel'), return; end
+        end
+
         field = data.dlc.hd.list_bodyparts.Value;
         xdata = data.dlc.table.([field '_x']);
         ydata = data.dlc.table.([field '_y']);
         
-        [tempX, tempY, mask, seg] = DLC.dlc_fix_predict(xdata,ydata, ...
+        [tempX, tempY, mask, seg] = DLC.dlc_fix(xdata,ydata, ...
             jumpthresh.Value, winwidth.Value);
 
         data.dlc.table.temp_x = tempX;
@@ -54,7 +66,7 @@ function fig = dlc_fix_GUI(mousePos)
         % segments, for display and click editing in dlc_viewer
         data.dlc.seg = seg;
         data.dlc.seg_bodypart = field;
-        data.dlc.previewParameters = [jumpthresh.Value winwidth.Value];
+        data.dlc.previewParameters = [jumpthresh.Value winwidth.Value]; % for the Save As name
         
         % plot comparison
         data.notifyDLC('preview');
@@ -65,17 +77,20 @@ function fig = dlc_fix_GUI(mousePos)
 
         if ~ismember('temp_x', data.dlc.table.Properties.VariableNames) || ...
                 ~isfield(data.dlc, 'seg_bodypart') || ...
-                ~strcmp(data.dlc.seg_bodypart, data.dlc.hd.list_bodyparts.Value) || ...
-                ~isfield(data.dlc, 'previewParameters') || ...
-                ~isequal(data.dlc.previewParameters, [jumpthresh.Value winwidth.Value])
-            preview;
+                ~strcmp(data.dlc.seg_bodypart, data.dlc.hd.list_bodyparts.Value) 
+            uialert(fig, 'Preview first.');
+            return;
         end
 
         % get new body part name to save
         opt.WindowStyle = 'modal';
         opt.Interpreter = 'none';
-        newName = sprintf('%s_FixJ%gW%d', ...
-                data.dlc.hd.list_bodyparts.Value, jumpthresh.Value, winwidth.Value);
+        % name after the previewed parameters; the fields may have changed since
+        params = [jumpthresh.Value winwidth.Value];
+        if isfield(data.dlc, 'previewParameters') && numel(data.dlc.previewParameters) == 2
+            params = data.dlc.previewParameters;
+        end
+        newName = sprintf('%s_FixJ%gW%d', data.dlc.hd.list_bodyparts.Value, params(1), params(2));
         newName = inputdlg('Enter new name:', 'Save As', [1 30], {newName}, opt);
         if isempty(newName), return; end
         newName = newName{1};

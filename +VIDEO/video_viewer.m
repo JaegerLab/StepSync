@@ -527,7 +527,6 @@ function onMouseUp(~, ~)
             bodypart = data.dlc.hd.list_bodyparts.Value;
             data.dlc.table.([bodypart '_x'])(frameIdx) = drag.marker.XData;
             data.dlc.table.([bodypart '_y'])(frameIdx) = drag.marker.YData;
-            data.dlc.previewParameters = []; % source changed; regenerate before Save As
             data.notifyDLC('edit', {bodypart});
         elseif isequal(drag.marker, hd.dlcTempMarker)
             data.dlc.table.temp_x(frameIdx) = drag.marker.XData;

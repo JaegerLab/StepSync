@@ -30,7 +30,42 @@ function fig = emg_prep_GUI(mousePos)
         'Layout', matlab.ui.layout.GridLayoutOptions('Row', 4, 'Column', 1));
     uibutton(grid1, 'Text','Apply & Close', 'ButtonPushedFcn', @saveClose);
     uibutton(grid1, 'Text','Cancel', 'ButtonPushedFcn', @cancelClose);
+
+    % show the settings of the selected data type: those it was made with
+    % (processed), or the defaults (raw)
+    defaults = getParameters();
+    lastType = '';
+    typeListener = addlistener(data, 'EMGChanged', @(~,~)showTypeParameters());
+    showTypeParameters();
     drawnow
+
+    function showTypeParameters()
+        if ~isvalid(fig) || ~data.has('emg'), return; end
+        type = data.emg.hd.datatype.Value;
+        if strcmp(type, lastType), return; end   % e.g. after a preview
+        lastType = type;
+        parameters = defaults;
+        k = sscanf(type, 'Processed %d');
+        if ~isempty(k) && k <= numel(data.emg.processed) && ...
+                isstruct(data.emg.processed(k).parameters) && ...
+                ~isempty(data.emg.processed(k).parameters)
+            parameters = data.emg.processed(k).parameters;
+        end
+        setParameters(parameters);
+    end
+
+    % inverse of getParameters; missing values keep the defaults
+    function setParameters(p)
+        chkHighPass.Value = isfield(p, 'HighPassFreq');
+        editHighPass.Value = defaults.HighPassFreq;
+        if chkHighPass.Value, editHighPass.Value = p.HighPassFreq; end
+        chkFiltFilt.Value = defaults.FiltFilt;
+        if isfield(p, 'FiltFilt'), chkFiltFilt.Value = p.FiltFilt; end
+        chkRectify.Value = isfield(p, 'Rectify') && p.Rectify;
+        chkDownSample.Value = isfield(p, 'DownSampleRate');
+        editDownRate.Value = defaults.DownSampleRate;
+        if chkDownSample.Value, editDownRate.Value = p.DownSampleRate; end
+    end
 
     function preview(~,~)
         if ~data.has('emg'), return; end
@@ -105,6 +140,7 @@ function fig = emg_prep_GUI(mousePos)
     end
 
     function onClose(src,~)
+        delete(typeListener);
         if isfield(data.emg, 'temp')
             data.emg = rmfield(data.emg, 'temp');
         end

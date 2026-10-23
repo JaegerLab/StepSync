@@ -58,7 +58,7 @@ for example, `Rate: 20000 Hz, Length: 600.00 s` and
 
 Click the plot to move the cursor. Raw data is drawn in blue, processed data
 in green and the preprocessing preview in yellow. Steps from the Gait viewer
-appear as magenta circles on the time axis.
+appear as magenta circles on the EMG trace.
 
 ## Channel map
 
@@ -81,7 +81,9 @@ any column, for example by muscle.
 
 **Pre-Process** opens the preprocessing window. It processes the data type
 currently selected in the viewer, so steps can be chained (for example, a
-second down-sampling of *Processed 1*).
+second down-sampling of *Processed 1*). The window shows the settings of the
+selected type: the ones a processed type was made with, or the defaults
+below for `Raw`. Selecting another type also discards the preview.
 
 | Setting | Default | Description |
 |---|---|---|

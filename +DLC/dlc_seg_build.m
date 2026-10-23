@@ -12,7 +12,7 @@ function seg = dlc_seg_build(x, y, jump_thresh, win_width, extra_breaks)
 %   seeds. extra_breaks (frame indices t) adds boundaries after frame t,
 %   e.g. where a mask changes value.
 %
-%   Segment structure (shared by dlc_fix_predict and auto_window_width)
+%   Segment structure (shared by dlc_fix and auto_window_width)
 %   Per segment (M x 1):
 %     start, stop, len   first frame, last frame, number of frames
 %     flag               2  seed (>= win_width, or confirmed by the user)
@@ -22,7 +22,7 @@ function seg = dlc_seg_build(x, y, jump_thresh, win_width, extra_breaks)
 %                       -2  questionable (checked, did not match)
 %                       -3  rejected by the user (locked bad)
 %                        good frames: flag > 0
-%     is_new             true = edited, recheck around it (see dlc_fix_predict)
+%     is_new             true = edited, recheck around it (see dlc_fix)
 %     round              propagation round in which the flag was set
 %                        (0 for seeds/locked, NaN if never flagged)
 %     err                distance to the interpolation when last checked

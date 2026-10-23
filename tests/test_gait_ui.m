@@ -247,6 +247,13 @@ verifyEqual(testCase,p.parameters.DownSampleRate,300);
 % processing a processed type records it as the source
 callback = preprocess.ButtonPushedFcn; callback(preprocess,[]);
 prep = S.emg.hd.prepGUI;
+% the window shows the settings Processed 1 was made with; Raw shows defaults
+rate = findall(prep,'Type','uinumericeditfield','Value',300);
+verifyNumElements(testCase,rate,1);
+hd.datatype.Value = 'Raw'; callback = hd.datatype.ValueChangedFcn; callback(hd.datatype,[]);
+verifyEqual(testCase,rate.Value,200);
+hd.datatype.Value = 'Processed 1'; callback(hd.datatype,[]);
+verifyEqual(testCase,rate.Value,300);
 check = findall(prep,'Type','uicheckbox','Text','Down Sample'); check.Value = false;
 check = findall(prep,'Type','uicheckbox','Text','High Pass'); check.Value = false;   % 500 Hz is above Nyquist here
 apply = findall(prep,'Type','uibutton','Text','Apply & Close');

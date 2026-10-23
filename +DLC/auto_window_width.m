@@ -49,7 +49,7 @@ function [w, info] = auto_window_width(x, y, varargin)
 %     w, w_quantile           returned width and the raw quantile q
 %     seg                     segment structure (see DLC.dlc_seg_build), with
 %                             segments >= w flagged as seeds. Can be passed
-%                             straight to DLC.dlc_fix_predict(x, y, [], [], seg)
+%                             straight to DLC.dlc_fix(x, y, [], [], seg)
 %     is_error                per segment: inside an out-and-back excursion
 %     excursions              [outJump returnJump firstFrame lastFrame duration]
 %     err_len                 lengths of segments flagged as errors
@@ -62,7 +62,7 @@ function [w, info] = auto_window_width(x, y, varargin)
 %   Example
 %     M = readmatrix('ForePawL.csv');
 %     [w, info] = DLC.auto_window_width(M(:,1), M(:,2), [], 'Plot', true);
-%     [x_fix, y_fix, mask, seg] = DLC.dlc_fix_predict(M(:,1), M(:,2), [], [], info.seg);
+%     [x_fix, y_fix, mask, seg] = DLC.dlc_fix(M(:,1), M(:,2), [], [], info.seg);
 
 % ---- inputs -----------------------------------------------------------
 thr = [];

@@ -6,7 +6,7 @@ function seg = dlc_seg_toggle_jump(seg, t)
 %   If there is a jump after frame t, it is removed and the two segments
 %   are merged. Otherwise the segment containing frames t and t+1 is split
 %   there. The resulting segment(s) get flag 0 and is_new = true, so the
-%   next call to dlc_fix_predict(x, y, [], [], seg) re-judges them by the
+%   next call to dlc_fix(x, y, [], [], seg) re-judges them by the
 %   normal rules (seed if len >= win_width, otherwise propagation) and
 %   rechecks only the stretch between the nearest original seeds.
 %

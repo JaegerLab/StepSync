@@ -46,6 +46,7 @@ pose file to be checked against its length.
 | Frame | Current frame number |
 | DLC Fix | Open the correction window for the selected body part |
 | Body-part list | The body part to display, correct and overlay on the video |
+| Delete bodypart | Remove the selected body part from the data (asks first; the last one cannot be deleted) |
 
 The vertical axis is in image pixels and runs downwards, as in the image.
 Click a trace to move the cursor. Steps from the Gait viewer appear as
@@ -105,7 +106,7 @@ and **Auto seg width**, re-estimate them. You can also type your own values.
    | Seed | 0.95 |
    | Accepted by propagation | 0.9 |
    | Questionable or undetermined | 0.5 |
-   | Rejected | 0.1 |
+   | Rejected by propagation | 0.1 |
    | Rejected by you | 0 |
 
 ### Reviewing and editing
@@ -135,9 +136,12 @@ You can correct the result directly on the *x*/*y* traces:
 After each edit, only the stretch between the surrounding seeds is
 recomputed.
 
+Changing the parameters does not update the preview, so your edits are kept
+until you click **Preview** again, which asks before discarding them.
+
 ### Keeping the result
 
-**Save As** adds the corrected trajectory to the data as a new body part. The
+**Save As** saves the previewed body part (preview first). It adds the corrected trajectory to the data as a new body part. The
 default name is `<bodypart>_FixJ<threshold>W<width>`, which records the
 settings used, and the original stays unchanged. The new body part can then
 be imported in the Gait viewer. Closing the correction window discards an

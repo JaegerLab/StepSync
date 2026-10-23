@@ -21,7 +21,7 @@ the copy it has.
 
 | Control | Default | Description |
 |---|---|---|
-| Frame rate | — | The shared frame rate (read only) |
+| Frame rate | — | The shared frame rate. Type a rate to override it, e.g. when analysing a DLC file without video or EMG (see [Timing](synchronization.md)) |
 | Resolution | 30 px/cm | Converts pixels to centimetres |
 | Trace | X | `X`, `Y` (cm) or `Speed` (cm/s) |
 | Paw thresh | automatic | Threshold for the selected paw and trace |
@@ -127,6 +127,11 @@ earlier one. The buttons **Add**, **Update**, **Move up**, **Move down**,
 ### Applying
 
 - **Preview** shows the mask on the gait trace without changing the analysis.
+  With speed data loaded, it also draws the speed on a right-hand axis (black
+  where it passes the threshold, gray where it fails; manual rules are not
+  included) and the threshold as a dashed black line. Click **Preview** again
+  after changing settings. **Generate Mask** or **Cancel** removes the right
+  axis.
 - **Generate Mask** applies it, recomputes the events and closes the editor.
 - **Cancel** discards the changes.
 

@@ -1,10 +1,10 @@
-function [x_fix, y_fix, mask, seg] = dlc_fix_predict(x, y, jump_thresh, win_width, mask_or_seg, visualize)
-%DLC_FIX_PREDICT  Fix DLC mislabels by progressive interpolation from seeds.
+function [x_fix, y_fix, mask, seg] = dlc_fix(x, y, jump_thresh, win_width, mask_or_seg, visualize)
+%DLC_FIX  Fix DLC mislabels by progressive interpolation from seeds.
 %
-%   [x_fix, y_fix, mask, seg] = DLC.dlc_fix_predict(x, y)
-%   [x_fix, y_fix, mask, seg] = DLC.dlc_fix_predict(x, y, jump_thresh, win_width)
-%   [x_fix, y_fix, mask, seg] = DLC.dlc_fix_predict(x, y, jump_thresh, win_width, mask_or_seg)
-%   [...] = DLC.dlc_fix_predict(..., visualize)
+%   [x_fix, y_fix, mask, seg] = DLC.dlc_fix(x, y)
+%   [x_fix, y_fix, mask, seg] = DLC.dlc_fix(x, y, jump_thresh, win_width)
+%   [x_fix, y_fix, mask, seg] = DLC.dlc_fix(x, y, jump_thresh, win_width, mask_or_seg)
+%   [...] = DLC.dlc_fix(..., visualize)
 %
 %   The trace is cut into segments at jumps. Segments at least win_width
 %   long are seeds. Propagation then repeats:
@@ -74,7 +74,7 @@ SEED = 2; GOOD = 1; REJECT = -3;
 x = x(:); y = y(:);
 N = numel(x);
 if numel(y) ~= N
-    error('dlc_fix_predict:size', 'x and y must have the same length.');
+    error('dlc_fix:size', 'x and y must have the same length.');
 end
 if nargin < 3, jump_thresh = []; end
 if nargin < 4, win_width = []; end
@@ -90,12 +90,12 @@ elseif (islogical(mask_or_seg) || isnumeric(mask_or_seg)) && numel(mask_or_seg) 
     m = mask_or_seg(:);
     if ~islogical(m)
         if ~all(m == 0 | m == 1)
-            error('dlc_fix_predict:mask', 'A numeric mask may only contain 0 and 1.');
+            error('dlc_fix:mask', 'A numeric mask may only contain 0 and 1.');
         end
         m = (m == 1);
     end
 else
-    error('dlc_fix_predict:input', ...
+    error('dlc_fix:input', ...
         'mask_or_seg must be a mask with one value per frame, or a segment structure.');
 end
 
@@ -179,7 +179,7 @@ seg = find_conflicts(seg, x, y, P);
 mask = DLC.dlc_seg_mask(seg);
 g = mask & isfinite(x) & isfinite(y);
 if ~any(g)
-    warning('dlc_fix_predict:noGood', 'No good frames; returning the raw trace.');
+    warning('dlc_fix:noGood', 'No good frames; returning the raw trace.');
     x_fix = x; y_fix = y;
 else
     [x_fix, y_fix] = interp_hold((1:N)', x, y, g);
@@ -366,14 +366,14 @@ function seg = check_seg(seg, N)
 need = {'start', 'stop', 'flag'};
 for f = need
     if ~isfield(seg, f{1})
-        error('dlc_fix_predict:seg', 'Segment structure needs field "%s".', f{1});
+        error('dlc_fix:seg', 'Segment structure needs field "%s".', f{1});
     end
 end
 seg.start = seg.start(:); seg.stop = seg.stop(:); seg.flag = double(seg.flag(:));
 M = numel(seg.start);
 if seg.start(1) ~= 1 || seg.stop(end) ~= N || ...
         any(seg.start(2:end) ~= seg.stop(1:end-1) + 1) || any(seg.stop < seg.start)
-    error('dlc_fix_predict:seg', ...
+    error('dlc_fix:seg', ...
         'Segments must be contiguous and cover frames 1..%d.', N);
 end
 seg.len = seg.stop - seg.start + 1;
@@ -393,31 +393,99 @@ end
 
 % ==========================================================================
 function plot_result(x, y, x_fix, y_fix, seg)
+% The same layers and styles as the fix overlay in the DLC viewer
+% (DLC.fix_style), plus the suggestion for each conflict.
+S = DLC.fix_style();
 N = numel(x); t = (1:N)';
-fe = repelem(seg.flag, seg.len);
-figure('Color', 'w'); hold on;
-plot(t, [x y], '-', 'Color', [0.7 0.7 0.7]);
-plot(t, [x_fix y_fix], 'k-', 'LineWidth', 1);
-styles = {2, [0 0.6 0], '.', 'seed'; 1, [0 0.45 0.9], '.', 'good (propagated)'; ...
-          -1, [0.85 0 0], 'x', 'bad'; -2, [0.8 0 0.8], '^', 'questionable'; ...
-          -3, [0.5 0 0], 's', 'rejected'; 0, [0.5 0.5 0.5], 'o', 'unflagged'};
-h = []; lab = {};
-for i = 1:size(styles, 1)
-    sel = fe == styles{i, 1};
-    if ~any(sel), continue; end
-    xs = x; ys = y; xs(~sel) = NaN; ys(~sel) = NaN;
-    hh = plot(t, [xs ys], styles{i, 3}, 'Color', styles{i, 2}, 'MarkerSize', 4);
-    h(end+1) = hh(1); lab{end+1} = styles{i, 4}; %#ok<AGROW>
+fe = repelem(seg.flag, seg.len);            % flag per frame
+good = fe > 0;
+win = seg.win_width;
+mk = {'LineStyle', 'none', 'MarkerSize', S.markSize, 'LineWidth', S.markWidth};
+attn = {'LineStyle', 'none', 'Marker', S.attnMarker, 'MarkerSize', S.attnSize, ...
+    'LineWidth', S.attnWidth};
+
+figure('Color', 'w'); ax = gca; hold(ax, 'on');
+axis(ax, 'ij');                             % image coordinates, as in the viewer
+
+% interpolation where it replaces data, joined to the good frames
+show = ~good;
+show = show | [show(2:end); false] | [false; show(1:end-1)];
+% jumps: from the last frame before each jump to the first frame after it
+a = seg.stop(1:end-1); a = a(:);
+% frame markers (seeds from the algorithm are not marked)
+userGood = repelem(seg.flag == 2 & ~(seg.len >= win), seg.len);
+layers = { ...
+    'good',     fe == 1,  S.goodMarker,     S.good, 'none'; ...
+    'userGood', userGood, S.userGoodMarker, S.good, S.good; ...
+    'bad',      fe == -1, S.badMarker,      S.bad,  'none'; ...
+    'quest',    fe == -2, S.questMarker,    S.grey, 'none'; ...
+    'userBad',  fe == -3, S.userBadMarker,  S.bad,  'none'; ...
+    'unflag',   fe == 0,  S.unflagMarker,   S.grey, 'none'};
+% needs attention: frames at both ends
+c = seg.stop([seg.conflict(:); false]);
+k = find((seg.flag == -1 | seg.flag == -2) & seg.len >= S.longBadFrac * win);
+d = diff([false; ~good; false]);
+rs = find(d == 1); re = find(d == -1) - 1;
+long = (re - rs + 1) >= S.longInterpFrac * win;
+attnLayers = { ...
+    'attnConflict', [c; c + 1],                  S.attnConflict, false; ...
+    'attnLongBad',  [seg.start(k); seg.stop(k)], S.attnLongBad,  false; ...
+    'attnInterp',   [rs(long); re(long)],        S.attnInterp,   true};
+
+% one legend entry per layer, from whichever coordinate draws it first
+h = gobjects(0);
+named = {};
+coords = {x(:), x_fix(:), S.xColor, 'x'; y(:), y_fix(:), S.yColor, 'y'};
+for i = 1:2
+    v = coords{i, 1}; vfix = coords{i, 2};
+    add(plot(ax, t, v, '-', 'Color', coords{i, 3}, 'LineWidth', S.trace), ...
+        coords{i, 4}, true);
+    Y = vfix; Y(~show) = NaN;
+    add(plot(ax, t, Y, S.interpStyle, 'Color', S.interpColor, 'LineWidth', S.interpWidth), ...
+        'interp', any(~good));
+    X = [t(a) t(a+1) nan(numel(a), 1)]'; Y = [v(a) v(a+1) nan(numel(a), 1)]';
+    add(plot(ax, X(:), Y(:), S.jumpStyle, 'Color', S.jumpColor, 'LineWidth', S.jumpWidth), ...
+        'jump', ~isempty(a));
+    for j = 1:size(layers, 1)
+        sel = layers{j, 2};
+        add(plot(ax, t(sel), v(sel), layers{j, 3}, 'Color', layers{j, 4}, ...
+            'MarkerFaceColor', layers{j, 5}, mk{:}), layers{j, 1}, any(sel));
+    end
+    for j = 1:size(attnLayers, 1)
+        f = attnLayers{j, 2};
+        w = v; if attnLayers{j, 4}, w = vfix; end   % long interpolation: on the fix
+        add(plot(ax, t(f), w(f), 'Color', attnLayers{j, 3}, attn{:}), attnLayers{j, 1}, ~isempty(f));
+    end
 end
-yl = ylim;
+
+% suggested fix for each conflict, at the jump
+yl = ylim(ax);
 for k = find(seg.conflict)'
     tc = seg.stop(k) + 0.5;
-    plot([tc tc], yl, 'r-', 'LineWidth', 1.5);
-    text(tc, yl(2), [' ' seg.suggestion{k}], 'Color', 'r', ...
-        'VerticalAlignment', 'top', 'Rotation', 90);
+    plot(ax, [tc tc], yl, ':', 'Color', S.attnConflict, 'LineWidth', 1, ...
+        'HandleVisibility', 'off');
+    text(ax, tc, yl(1), [' ' seg.suggestion{k}], 'Color', S.attnConflict, ...
+        'VerticalAlignment', 'top', 'Rotation', -90);
 end
-legend(h, lab, 'Location', 'best');
-xlabel('frame'); ylabel('x, y');
-title(sprintf('%d segments, %d good (%d seeds), %d conflicts', numel(seg.flag), ...
+ylim(ax, yl);
+
+% legend in the viewer's order
+[~, idx] = ismember([{'x', 'y'}, S.legendOrder], named);
+idx = idx(idx > 0);
+legend(ax, h(idx), 'Location', S.legendLocation, 'AutoUpdate', 'off');
+xlabel(ax, 'Frame'); ylabel(ax, 'Location (pixel)');
+title(ax, sprintf('%d segments, %d good (%d seeds), %d conflicts', numel(seg.flag), ...
     sum(seg.flag > 0), sum(seg.flag == 2), sum(seg.conflict)));
+
+    % keep the first handle of each layer that has data, for the legend
+    function add(hl, name, hasData)
+        if isempty(hl), return; end         % plot() of no points returns no line
+        hl.DisplayName = S.legend.(name);
+        if hasData && ~ismember(name, named)
+            h(end+1) = hl;
+            named{end+1} = name;
+        else
+            hl.HandleVisibility = 'off';
+        end
+    end
 end

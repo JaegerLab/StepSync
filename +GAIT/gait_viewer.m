@@ -22,8 +22,10 @@ function fig = gait_viewer()
             'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
         subgrid1.ColumnWidth = {'1x', 130,130,130,120,120};
         hd.info = uilabel(subgrid1,'Text',' Info:', 'BackgroundColor','w');
-        hd.frameRate = uieditfield(subgrid1,'numeric','Value',1, ...
-            'ValueDisplayFormat','Frame rate: %.2f Hz', 'Editable','off');
+        hd.frameRate = uieditfield(subgrid1,'numeric','Value',data.getFrameRate(), ...
+            'Limits', [0 Inf], 'LowerLimitInclusive', 'off', ...
+            'ValueDisplayFormat','Frame rate: %.2f Hz', ...
+            'ValueChangedFcn', @(src,~)data.setFrameRate(src.Value));
         hd.resolution = uieditfield(subgrid1,'numeric','Value',30, ...
             'ValueDisplayFormat','Resolution: %d px/cm', ...
             'ValueChangedFcn', @(~,~)updateInfo);
@@ -43,12 +45,8 @@ function fig = gait_viewer()
 
 
         %% Row 2: DLC plot
-        hd.ax = uiaxes(grid1); hold(hd.ax, 'on');
-        hd.ax.ButtonDownFcn = @axClicked;
-        hd.ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
-        hd.ax.Layout.Row = [2 3]; hd.ax.Layout.Column = 1;
-        ylabel(hd.ax, 'X (cm)'); xlabel(hd.ax, 'Time (s)')
-        disableDefaultInteractivity(hd.ax)
+        hd.ax = createAxes(grid1);
+        ylabel(hd.ax, 'X (cm)');
 
         subgrid3 = uigridlayout(grid1, [4 1], Padding = [0 0 0 0], ...
             RowHeight={'1x', 30, '1x', 30});
@@ -87,6 +85,28 @@ function fig = gait_viewer()
 
         data.gait(1).hd = hd;
         notify(data, 'WindowsChanged');
+    end
+
+    % plot axes in rows 2-3, column 1 of the main grid
+    function ax = createAxes(parent)
+        ax = uiaxes(parent); hold(ax, 'on');
+        ax.ButtonDownFcn = @axClicked;
+        ax.XAxis.LimitsChangedFcn = @(src,evt)axZoomChanged(src,evt);
+        ax.Layout.Row = [2 3]; ax.Layout.Column = 1;
+        xlabel(ax, 'Time (s)')
+        disableDefaultInteractivity(ax)
+    end
+
+    % A right y axis cannot be removed from an axes: replace the axes. The
+    % plots are recreated by the next plotTrace/plotSteps.
+    function hd = removeRightAxis(hd)
+        old = hd.ax;
+        hd.ax = createAxes(old.Parent);
+        ylabel(hd.ax, old.YAxis(1).Label.String);
+        xlim(hd.ax, old.XLim);
+        delete(old);
+        hd = rmfield(hd, intersect(fieldnames(hd), ...
+            {'maskSpeedGood', 'maskSpeedBad', 'maskSpeedThres'}));
     end
 
     function importPaws(~,~)
@@ -291,6 +311,10 @@ function fig = gait_viewer()
    
     function plotTrace()
         hd = data.gait.hd;
+        % preview gone: drop the right axis with its speed plots
+        if ~hasSpeedPreview(data.gait.t) && numel(hd.ax.YAxis) > 1
+            hd = removeRightAxis(hd);
+        end
         hold(hd.ax, 'on');
 
         % get trace
@@ -336,7 +360,34 @@ function fig = gait_viewer()
                         data.currentTime, [], ...
                         'k-', 'HitTest', 'off');
 
+        % speed-threshold part of a mask preview, on the right y axis:
+        % speed black where good, gray where bad, and the threshold
+        if hasSpeedPreview(t)
+            sp = data.gait.maskTempSpeed;
+            good = logical(sp.good(:));
+            bad = ~good;
+            bad = bad | bad([1 1:end-1]) | bad([2:end end]);
+            speed_good = sp.speed(:); speed_good(~good) = NaN;
+            speed_bad = sp.speed(:); speed_bad(~bad) = NaN;
+            yyaxis(hd.ax, 'right'); hold(hd.ax, 'on');
+            hd = shared.myPlot(@plot, hd, 'maskSpeedBad', hd.ax, sp.t, speed_bad, ...
+                'Color', [0.6 0.6 0.6], 'LineStyle', '-', 'Marker', 'none', 'HitTest', 'off');
+            hd = shared.myPlot(@plot, hd, 'maskSpeedGood', hd.ax, sp.t, speed_good, ...
+                'Color', 'k', 'LineStyle', '-', 'Marker', 'none', 'HitTest', 'off');
+            hd = shared.myPlot(@yline, hd, 'maskSpeedThres', hd.ax, ...
+                [], sp.threshold, 'k--', 'HitTest', 'off');
+            ylabel(hd.ax, 'Mask speed (cm/s)');
+            hd.ax.YAxis(2).Color = 'k';
+            yyaxis(hd.ax, 'left');
+            hd.ax.YAxis(1).Color = [0.15 0.15 0.15];   % yyaxis recolours the left axis
+        end
+
         data.gait.hd = hd;
+    end
+
+    function tf = hasSpeedPreview(t)
+        tf = isfield(data.gait, 'maskTempSpeed') && ...
+            numel(data.gait.maskTempSpeed.speed) == numel(t);
     end
 
     function invalidateSteps()
@@ -403,7 +454,11 @@ function fig = gait_viewer()
     end
 
     function previewChanged()
-        if data.has('gait'), plotTrace(); end
+        if ~data.has('gait'), return; end
+        oldAx = data.gait.hd.ax;
+        plotTrace();
+        % the axes were replaced: redraw the step markers on the new ones
+        if data.gait.hd.ax ~= oldAx, plotSteps(); end
     end
 
     function updateStepOptions(traceType)
@@ -486,6 +541,7 @@ function fig = gait_viewer()
 
     function updateInfo()
         updateTitle();
+        data.gait.hd.frameRate.Value = data.getFrameRate();   % also without gait data
         if data.has('gait')
             invalidateSteps();
             getSpeeds()
@@ -674,6 +730,7 @@ function fig = gait_viewer()
             % frame count changed: the mask no longer fits, start over
             data.gait.mask = true(height(table_dlc), 1);
             if isfield(data.gait, 'maskTemp'), data.gait = rmfield(data.gait, 'maskTemp'); end
+            if isfield(data.gait, 'maskTempSpeed'), data.gait = rmfield(data.gait, 'maskTempSpeed'); end
             notes{end+1} = 'The number of frames changed, so the mask was reset.';
         end
         updateInfo();

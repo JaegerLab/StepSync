@@ -1,10 +1,10 @@
 function [new_data, new_t, new_fs] = emg_prep(data, t, options, fs)
 % pre-process EMG data, high-pass, rectify, smooth then downsample
 % Syntax
-%  [new_data, new_t, new_fs] = emg_prep(data, t, options, fs)
+%  [new_data, new_t, new_fs] = EMG.emg_prep(data, t, options, fs)
 %
 % Parameters:
-%  emg: 2-D array, each channel is vertical vector
+%  data: 2-D array, each channel is vertical vector
 %  t: 1-D array, time axis.
 %  options: a structure with the following optional field
 %       HighPassFreq: a number. frequency to high pass filter

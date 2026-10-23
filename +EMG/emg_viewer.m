@@ -47,7 +47,7 @@ function fig = emg_viewer()
         subgrid3 = uigridlayout(grid1, [2 1], Padding=[0 0 0 0], ...
             RowHeight={'1x', 30});
         subgrid3.Layout.Row = 2; subgrid3.Layout.Column = 2;
-            hd.chanList = uilistbox(subgrid3, 'Multiselect', 'off', ...
+            hd.chanList = uilistbox(subgrid3, 'Multiselect', 'off', 'Enable', 'off', ...
                 'ValueChangedFcn', @(src,evt)updatePlots());
             subgrid4 = uigridlayout(subgrid3, [1 2], Padding = [0 0 0 0], ...
                         ColumnWidth ={50, '1x'});
@@ -149,6 +149,7 @@ function fig = emg_viewer()
 
         hd.datatype.Items = EMG.emg_types(data.emg);
         hd.sortby.Enable = 'off';
+        hd.chanList.Enable = 'on';
 
         notify(data, 'InfoChanged');
         notify(data, 'EMGChanged');
@@ -198,6 +199,7 @@ function fig = emg_viewer()
         else
             hd.sortby.Enable = 'off';
         end
+        hd.chanList.Enable = 'on';
 
         notify(data, 'InfoChanged');
         notify(data, 'EMGChanged');
@@ -271,7 +273,11 @@ function fig = emg_viewer()
         data.emg = EMG.emg_delete(data.emg, label);
         types = EMG.emg_types(data.emg);
         hd.datatype.Items = types;
-        if ~isempty(types), hd.datatype.Value = types{min(idx, end)}; end
+        if ~isempty(types) 
+            hd.datatype.Value = types{min(idx, end)}; 
+        else
+            hd.chanList.Enable = 'off';
+        end
         notify(data, 'EMGChanged');
         updateInfo();
     end
@@ -370,26 +376,25 @@ function fig = emg_viewer()
         src = currentSource();
         color = 'g';
         if strcmp(hd.datatype.Value, 'Raw'), color = 'b'; end
-        hd = shared.myPlot(@plot, hd, 'dataPlot', ...
-            hd.ax, src.t, src.data(:,channels), [color '-'], 'ButtonDownFcn', @axClicked);
+        hd = shared.myPlot(@plot, hd, 'dataPlot', hd.ax, ...
+            src.t, src.data(:,channels), [color '-'], 'ButtonDownFcn', @axClicked);
         hd.dataPlot.Color = color;
         hd.dataPlot.Visible = true;
         % pre-process preview, over its source
         if isfield(data.emg, 'temp')
             t = data.emg.temp.t;
             y = data.emg.temp.data;
-            hd = shared.myPlot(@plot, hd, 'tempPlot', ...
-                hd.ax, t, y, 'y-', 'ButtonDownFcn', @axClicked);
+            hd = shared.myPlot(@plot, hd, 'tempPlot', hd.ax, ...
+                t, y, 'y-', 'ButtonDownFcn', @axClicked);
             hd.tempPlot.Visible = true;
         else
             hd = hidePlot(hd, 'tempPlot');
         end
 
-        if isfield(hd, 'timeline') && ishghandle(hd.timeline)
-            hd.timeline.Value = data.currentTime;
-        else
-            hd.timeline = xline(hd.ax, data.currentTime, 'k', 'HitTest','off');
-        end
+        % draw timeline
+        hd = shared.myPlot(@xline, hd, 'timeline', hd.ax, ...
+            data.currentTime, [], 'k', 'HitTest','off');
+        
         data.emg.hd = hd;
         drawSteps();
     end
@@ -400,14 +405,17 @@ function fig = emg_viewer()
         end
     end
 
-    % gait steps as markers on the time axis (y = 0)
+    % gait steps as markers on the EMG trace
     function drawSteps()
         if ~isfield(data.emg, 'hd'), return; end
         hd = data.emg.hd;
         steps = GAIT.current_steps(data);
-        if data.has('emg') && ~isempty(steps) && ~isempty(steps.t)
+        if data.has('emg') && ~isempty(steps) && ~isempty(steps.t) && ...
+                ~isempty(hd.chanList.Value)
+            src = currentSource();
+            y = interp1(src.t, src.data(:,hd.chanList.Value), steps.t, 'linear');
             hd = shared.myPlot(@scatter, hd, 'stepMarker', hd.ax, ...
-                steps.t, zeros(size(steps.t)), ...
+                steps.t, y, ...
                 'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, 'HitTest', 'off');
             hd.stepMarker.Visible = 'on';
         elseif isfield(hd, 'stepMarker') && isgraphics(hd.stepMarker)
@@ -487,7 +495,9 @@ function fig = emg_viewer()
     end
 
     function typeChanged(~,~)
-        updatePlots
+        % a preview belongs to the type it was made from
+        if isfield(data.emg, 'temp'), data.emg = rmfield(data.emg, 'temp'); end
+        notify(data, 'EMGChanged');   % redraws; the pre-process window follows the type
         updateInfo
     end
 

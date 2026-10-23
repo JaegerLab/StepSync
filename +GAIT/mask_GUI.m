@@ -1185,12 +1185,28 @@ function maskFig = mask_GUI(mousePos)
 
     function previewMask(~, ~)
         data.gait.maskTemp = buildCombinedMask();
+        % speed and threshold for the gait viewer; colored by the speed
+        % rule only, without the manual rules
+        if isempty(state.Speed)
+            removeSpeedPreview();
+        else
+            [speed, time] = getProcessedSpeed();
+            data.gait.maskTempSpeed = struct('t', time, 'speed', speed, ...
+                'good', generateSpeedMask(), 'threshold', state.SpeedThreshold);
+        end
         notify(data, 'MaskPreviewChanged');
+    end
+
+    function removeSpeedPreview()
+        if isfield(data.gait, 'maskTempSpeed')
+            data.gait = rmfield(data.gait, 'maskTempSpeed');
+        end
     end
 
     function generateMaskAndClose(~, ~)
         data.gait.mask = buildCombinedMask();
         if isfield(data.gait, 'maskTemp'), data.gait = rmfield(data.gait, 'maskTemp'); end
+        removeSpeedPreview();
         syncPublicState();
         notify(data, 'MaskChanged');
         close(maskFig);
@@ -1231,6 +1247,7 @@ function maskFig = mask_GUI(mousePos)
         if isfield(data.gait, 'maskTemp')
             data.gait = rmfield(data.gait, 'maskTemp');
         end
+        removeSpeedPreview();
         notify(data, 'MaskPreviewChanged');
         delete(src);
         notify(data, 'WindowsChanged');

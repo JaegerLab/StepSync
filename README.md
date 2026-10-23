@@ -70,6 +70,7 @@ detail.
 | [Gait analysis](docs/gait.md) | Step detection, event definitions, masks |
 | [Step-triggered average](docs/sta.md) | STA computation and null controls |
 | [Sessions and files](docs/files.md) | Session files, saved data formats, workspace export |
+| [Command-line functions](docs/functions.md) | Using preprocessing, pose correction, step detection and STA in your own scripts |
 
 Tests are described in [tests/README.md](tests/README.md).
 

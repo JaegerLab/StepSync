@@ -49,9 +49,9 @@ Every module window has the same menu bar.
 
 | Item | Shortcut | Action |
 |---|---|---|
-| Open | Ctrl+O | Open a file for this module |
+| Open | Ctrl+O | Open a file for this module (EMG: **Open File**) |
 | Save | Ctrl+S | Save this module's data (see [Sessions and files](files.md)) |
-| *(module-specific items)* | | EMG: **Open .mat**. Gait: **Import DLC** |
+| *(module-specific items)* | | EMG: **Open folder**. Gait: **Import DLC** |
 | Load session | | Replace everything with a saved session |
 | Save session | | Save the open modules to one session file |
 | Export to Workspace | | Put the session data in the MATLAB base workspace |
@@ -91,9 +91,9 @@ The order below is the usual one. Opening the EMG first means video and pose
 frames are timed by the camera TTL pulses from the start.
 
 1. **EMG.** In the EMG viewer, choose `File > Open` and select the folder
-   that holds the recording. If the recording has more than one digital input,
-   choose the line that carries the camera trigger. The info line then shows
-   the number of TTL pulses and their frequency. See [EMG viewer](emg.md).
+   that holds the recording. In the trigger menu, choose the digital channel
+   that carries the camera trigger. The info line then shows the number of
+   TTL pulses and their frequency. See [EMG viewer](emg.md).
 2. **Preprocess EMG** (optional). Click **Pre-Process**, check the settings,
    **Preview** one channel, then **Apply & Close**. The result appears as
    *Processed 1* in the data-type list.

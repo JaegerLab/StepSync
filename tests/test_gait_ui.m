@@ -211,6 +211,51 @@ verifyEqual(testCase,[S.frameRate S.currentTime],[20 2]);
 verifyEqual(testCase,S.currentZoom,[1 3]);
 verifyFalse(testCase,S.closingAll);
 end
+function testEmgTriggerMenuAndFrameRateField(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+cleanup = onCleanup(@()shared.exit_all(false));
+EMG.emg_viewer(); DLC.dlc_viewer();
+menu = S.emg.hd.trigger; rate = S.dlc.hd.frameRate;
+verifyEqual(testCase,menu.Items,{'No data'});
+verifyEqual(testCase,[rate.Value string(rate.FontAngle)],["1" "italic"]);   % automatic: frame units
+verifyEmpty(testCase,findall(S.fig.emg,'Type','uibutton','Text','Push Frame Rate'));
+verifyEmpty(testCase,findall(S.fig.dlc,'Type','uibutton','Text','GetFrameRate'));
+% a recording with a 100 Hz camera line and a single long pulse
+t = (0:999)'/1000;
+S.emg.raw = struct('data',zeros(1000,1),'t',t,'sample_rate',1000);
+S.emg.processed = struct('data',{},'t',{},'sample_rate',{},'parameters',{});
+S.emg.analog_channels = {'A'}; S.emg.display_name = pwd;
+S.emg.digital = EMG.ttl_channels(t,[mod(0:999,10)'<2, t>=0.1 & t<0.9]);
+notify(S,'InfoChanged');
+verifyEqual(testCase,menu.Items,{'Select trigger channel', ...
+    'DIN-00: 99 TTL, 2 ms, 100 Hz','DIN-01: 1 TTL, 800 ms, - Hz'});
+verifyEqual(testCase,menu.Value,0);
+% a single pulse cannot be a trigger: refused, the previous choice is kept
+callback = menu.ValueChangedFcn;
+menu.Value = 2; callback(menu,struct('PreviousValue',0));
+verifyEqual(testCase,menu.Value,0);
+verifyFalse(testCase,isfield(S.emg,'trigger'));
+% a typed-in rate is cleared by choosing a trigger channel
+S.setFrameRate(30);
+verifyEqual(testCase,[rate.Value string(rate.FontAngle)],["30" "normal"]);
+menu.Value = 1; callback(menu,struct('PreviousValue',0));
+verifyEqual(testCase,[S.emg.trigger.number S.emg.trigger.freq S.frameRate],[99 100 0],'AbsTol',1e-9);
+verifyEqual(testCase,S.emg.trigger.channel,'DIN-00');
+verifyEqual(testCase,[rate.Value string(rate.FontAngle)],["100" "italic"]);
+% clearing the field returns to automatic
+rate.Value = []; rateCallback = rate.ValueChangedFcn; rateCallback(rate,[]);
+verifyEqual(testCase,S.frameRate,0);
+verifyEqual(testCase,rate.Value,100,'AbsTol',1e-9);
+% 'Select trigger channel' removes the trigger
+menu.Value = 0; callback(menu,struct('PreviousValue',1));
+verifyFalse(testCase,isfield(S.emg,'trigger'));
+verifyEqual(testCase,rate.Value,1);
+% no digital channel
+S.emg.digital = S.emg.digital([]); notify(S,'InfoChanged');
+verifyEqual(testCase,menu.Items,{'No digital channel'});
+end
 function testEmgTypesFollowProcessingAndDeletion(testCase)
 assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
 S = shared.SessionData.instance();
@@ -241,7 +286,7 @@ verifyTrue(testCase,logical(hd.deleteType.Enable));
 verifyEqual(testCase,hd.datatype.Items,{'Raw','Processed 1'});
 verifyEqual(testCase,hd.datatype.Value,'Processed 1');
 p = S.emg.processed(1);
-verifyEqual(testCase,p.sample_rate,2000/7,'AbsTol',1e-9);   % achieved 2000/round(2000/300), not requested
+verifyEqual(testCase,p.sample_rate,300);   % exactly the requested rate
 verifyEqual(testCase,p.parameters.Source,'Raw');
 verifyEqual(testCase,p.parameters.DownSampleRate,300);
 % processing a processed type records it as the source
@@ -255,11 +300,12 @@ verifyEqual(testCase,rate.Value,200);
 hd.datatype.Value = 'Processed 1'; callback(hd.datatype,[]);
 verifyEqual(testCase,rate.Value,300);
 check = findall(prep,'Type','uicheckbox','Text','Down Sample'); check.Value = false;
-check = findall(prep,'Type','uicheckbox','Text','High Pass'); check.Value = false;   % 500 Hz is above Nyquist here
+check = findall(prep,'Type','uicheckbox','Text','Filter'); check.Value = false;   % 500 Hz is above Nyquist here
 apply = findall(prep,'Type','uibutton','Text','Apply & Close');
 callback = apply.ButtonPushedFcn; callback(apply,[]);
 verifyEqual(testCase,S.emg.processed(2).parameters.Source,'Processed 1');
-verifyEqual(testCase,S.emg.processed(2).sample_rate,2000/7,'AbsTol',1e-9);   % no down sampling
+verifyEqual(testCase,S.emg.processed(2).sample_rate,300);   % no down sampling: the source's rate
+verifyEqual(testCase,S.emg.processed(2).t,S.emg.processed(1).t);
 % delete Raw, then everything: metadata stays, the placeholder returns
 S.emg = EMG.emg_delete(S.emg,'Raw'); notify(S,'EMGChanged');
 verifyEqual(testCase,hd.datatype.Items,{'Processed 1','Processed 2'});

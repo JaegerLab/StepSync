@@ -6,7 +6,7 @@ window and no session, and return plain MATLAB data.
 
 | Function | Purpose |
 |---|---|
-| [`EMG.emg_prep`](#emgemg_prep) | High-pass filter, rectify, smooth and down-sample EMG |
+| [`EMG.emg_prep`](#emgemg_prep) | Filter, rectify, smooth and down-sample EMG |
 | [`DLC.dlc_fix`](#dlcdlc_fix) | Correct jumps (mislabels) in a pose trajectory |
 | [`GAIT.detect_steps`](#gaitdetect_steps) | Find step events in a paw trace |
 | [`GAIT.sta`](#gaitsta) | Step-triggered average with a chance-level control |
@@ -49,11 +49,11 @@ frame times yourself.
 ## EMG.emg_prep
 
 ```matlab
-[new_data, new_t, new_fs] = EMG.emg_prep(data, t, options)
-[new_data, new_t, new_fs] = EMG.emg_prep(data, t, options, fs)
+[new_data, new_t] = EMG.emg_prep(data, t, options)
+[new_data, new_t] = EMG.emg_prep(data, t, options, fs)
 ```
 
-Preprocesses EMG in a fixed order: high-pass filter, rectify, smooth and
+Preprocesses EMG in a fixed order: filter, rectify, smooth and
 down-sample. Every step is optional and is switched on by a field of `options`.
 This is what **Pre-Process** in the [EMG viewer](emg.md) runs.
 
@@ -66,16 +66,17 @@ This is what **Pre-Process** in the [EMG viewer](emg.md) runs.
 
 | `options` field | Effect |
 |---|---|
-| `HighPassFreq` | High-pass filter at this frequency (Hz): 4th-order IIR (Butterworth) |
+| `FilterType` | `'highpass'`, `'lowpass'`, `'bandpass'` or `'bandstop'`: 4th-order IIR (Butterworth). Default: `'highpass'` or `'lowpass'` when only that frequency is given, `'bandpass'` when both are |
+| `HighPassFreq` | High-pass cutoff (Hz); a band edge for band filters |
+| `LowPassFreq` | Low-pass cutoff (Hz); a band edge for band filters. A band filter passes or stops the band between the two frequencies |
 | `FiltFilt` | `true`: zero-phase filtering with `filtfilt`. `false` (default): causal `filter` |
 | `Rectify` | `true`: absolute value. Default `false` |
-| `DownSampleRate` | Target rate (Hz). The data are smoothed with a moving window of 2.5 × the down-sampling factor, then every *k*-th sample is kept, with *k* = `round(fs/DownSampleRate)` |
+| `DownSampleRate` | New sample rate (Hz). The data are smoothed with a moving window of 2.5 × `fs/DownSampleRate` samples, then linearly interpolated at `k/DownSampleRate` (*k* = 0, 1, 2, …), so the rate is exact |
 
 | Output | Description |
 |---|---|
 | `new_data` | Processed data |
 | `new_t` | Time of each output sample |
-| `new_fs` | Achieved sample rate, `fs/k`, which can differ from `DownSampleRate` when `fs` is not a multiple of it |
 
 Samples at negative time (before the recording started) are dropped. A progress
 bar is shown while the function runs.
@@ -83,7 +84,11 @@ bar is shown while the function runs.
 ```matlab
 % envelope at ~500 Hz, zero-phase filter
 opt = struct('HighPassFreq', 30, 'FiltFilt', true, 'Rectify', true, 'DownSampleRate', 500);
-[env, t2, fs2] = EMG.emg_prep(raw, t, opt, 30000);
+[env, t2] = EMG.emg_prep(raw, t, opt, 30000);
+
+% band pass 20-450 Hz, no envelope
+opt = struct('FilterType', 'bandpass', 'HighPassFreq', 20, 'LowPassFreq', 450);
+bp = EMG.emg_prep(raw, t, opt, 30000);
 ```
 
 ## DLC.dlc_fix

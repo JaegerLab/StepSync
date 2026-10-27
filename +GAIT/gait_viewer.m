@@ -20,12 +20,9 @@ function fig = gait_viewer()
         %% Row 1: DLC processing
         subgrid1 = uigridlayout(grid1, [1 7], 'Padding', [0 0 0 0], ...
             'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
-        subgrid1.ColumnWidth = {'1x', 130,130,130,120,120};
+        subgrid1.ColumnWidth = {'1x', 150,130,130,120,120};
         hd.info = uilabel(subgrid1,'Text',' Info:', 'BackgroundColor','w');
-        hd.frameRate = uieditfield(subgrid1,'numeric','Value',data.getFrameRate(), ...
-            'Limits', [0 Inf], 'LowerLimitInclusive', 'off', ...
-            'ValueDisplayFormat','Frame rate: %.2f Hz', ...
-            'ValueChangedFcn', @(src,~)data.setFrameRate(src.Value));
+        hd.frameRate = shared.frame_rate_field(subgrid1);
         hd.resolution = uieditfield(subgrid1,'numeric','Value',30, ...
             'ValueDisplayFormat','Resolution: %d px/cm', ...
             'ValueChangedFcn', @(~,~)updateInfo);
@@ -289,8 +286,7 @@ function fig = gait_viewer()
 
     function getSpeeds()
         hd = data.gait.hd;
-        hd.frameRate.Value = data.getFrameRate;
-        data.gait.speedFactor = hd.frameRate.Value / hd.resolution.Value;
+        data.gait.speedFactor = data.getFrameRate() / hd.resolution.Value;
 
         for ii = 1:numel(hd.pawList.Items)    
             paw = data.gait.paw(ii);
@@ -541,7 +537,6 @@ function fig = gait_viewer()
 
     function updateInfo()
         updateTitle();
-        data.gait.hd.frameRate.Value = data.getFrameRate();   % also without gait data
         if data.has('gait')
             invalidateSteps();
             getSpeeds()

@@ -48,7 +48,7 @@ The launcher opens with four buttons: **Video**, **EMG**, **DLC** and
 **Gait**. A typical analysis:
 
 1. **EMG:** `File > Open` a recording folder, and pick the camera TTL channel
-   if asked.
+   in the trigger menu.
 2. **Video** (optional): `File > Open` the behaviour video.
 3. **DLC:** `File > Open` the pose file, and correct tracking errors with **DLC Fix**.
 4. **Gait:** `File > Import DLC`, choose the paws, set the threshold and mask,

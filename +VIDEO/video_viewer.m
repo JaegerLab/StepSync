@@ -30,18 +30,15 @@ function drawGUI()
     hd = struct();
 
     % Row 1: frame info
-    subgrid1 = uigridlayout(gl, [1 3], 'Padding', [0 0 0 0]);
-    subgrid1.ColumnWidth = {'1x', 130, 100, 90};
+    subgrid1 = uigridlayout(gl, [1 4], 'Padding', [0 0 0 0]);
+    subgrid1.ColumnWidth = {'1x', 150, 100, 90};
     subgrid1.Layout.Row = 1; subgrid1.Layout.Column = 1;
 
         % subgrid1
         hd.info = uilabel(subgrid1, ...
             'Text', 'Info:', 'BackgroundColor','W');
 
-        hd.frameRate = uieditfield(subgrid1, 'numeric', ...
-            'Limits', [0 Inf], 'LowerLimitInclusive', 'off', 'Value', 1, ...
-            'ValueDisplayFormat', 'FrameRate: %.2f Hz', ...
-            'ValueChangedFcn', @(src,~)updateFrameRate(src.Value));
+        hd.frameRate = shared.frame_rate_field(subgrid1);
 
         hd.time = uieditfield(subgrid1, 'numeric', ...
             'Limits', [0 Inf], ...
@@ -109,9 +106,6 @@ function openVideo(~,~)
     data.video.frameIdx = 1;
 
     data.video.hd = hd;
-
-    data.video.frameRate = data.getFrameRate();
-    hd.frameRate.Value = data.video.frameRate;
 
     updateInfo();
     updateVideoFrame(1);
@@ -304,9 +298,6 @@ function updateInfo()
     hd.time.Value = data.video.t(frameIdx);
     hd.slider.Value = frameIdx;
 
-    frameRate = data.getFrameRate();
-    hd.frameRate.Value = frameRate;
-
     % It's slow if opening video for the first time.
     totalFrames = data.video.vid.NumFrames;
     data.video.numFrames = totalFrames;
@@ -326,12 +317,6 @@ function updateInfo()
 
     data.video.hd = hd;
     updateTitle();
-end
-
-function updateFrameRate(value)
-    if data.has('video')
-        data.setFrameRate(value);
-    end
 end
 
 % callback function for frame-by-frame buttons

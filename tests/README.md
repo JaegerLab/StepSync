@@ -26,8 +26,10 @@ marker `fileFormat = 'StepSync session'`, `formatVersion = 3`) and checks that
 other files, older and newer formats are rejected. `test_emg` covers the EMG
 data types (Raw, Processed 1..N, renumbering after delete, `has('emg')` with
 processed data only, frame timing from the trigger without data), the EMG
-`.mat` file (selected types, processed-only loading, rejected files) and the
-achieved sample rate after down sampling. `test_files` covers DLC csv frame
+`.mat` file (selected types, processed-only loading, rejected files),
+down sampling onto an exact grid from time 0 and the four filter types, the
+TTL channel labels (count, width, rate) and the frame-rate sources (a typed-in
+rate replaces the trigger times; clearing it returns to automatic). `test_files` covers DLC csv frame
 numbers (a zoom-window save keeps the original frame numbers; on open a
 cropped file is shifted to 1 when the video has the same number of frames,
 otherwise padded with NaN) and the gait `.mat` file (round trip, zoom window
@@ -50,7 +52,7 @@ checkmarks and sub-windows, and Exit all resetting the session; and that
 restoring a session replaces all module windows and brings back window
 positions, widget values, data, frame rate, time and zoom; and that EMG
 pre-processing adds Processed types from the selected source (with the
-achieved rate and `parameters.Source`), the delete button is off while the
+requested rate and `parameters.Source`), the delete button is off while the
 pre-process window is open, and deleting every type keeps the trigger. The viewers
 are closed with `shared.exit_all(false)`, which skips the close confirmations.
 It is skipped without a desktop MATLAB session.
@@ -78,7 +80,8 @@ Manual checks with representative recordings are still required:
 
 - Load single and consecutive RHD/RHS files; verify sample/channel counts and TTL rate.
 - Switch to a recording without camera TTL; verify old triggers/processed data are gone.
-- Load Open Ephys and explicitly select the camera TTL line when several exist.
+- Load Intan and Open Ephys recordings; check the trigger menu labels (count, width, rate)
+  and that choosing the camera line synchronizes the frames.
 - Load DLC CSV/HDF5/MAT files (also SLEAP's DeepLabCut-format csv export); inspect markers at known frames.
 - Use a video whose encoded rate differs from acquisition rate; check first, consecutive,
   jumped-to and last frames, and playback speed.
@@ -98,7 +101,10 @@ Manual checks of EMG:
   "no data", plots disappear, and the video still uses the trigger timing.
 - Save with several types offers a selection; the title switches to the saved
   file. Choosing the `.mat` the EMG was opened from is refused.
-- Open .mat lists raw/processed with sizes; open only a processed type and
+- EMG Open File with one or several .rhd/.rhs files joins them; Open folder
+  still reads Intan and Open Ephys folders; mixing .mat with other files is
+  refused.
+- Open File with a .mat lists raw/processed with sizes; open only a processed type and
   check plots, channel map/sort, STA and zoom without raw data.
 - Without open-ephys-matlab-tools on the path, opening an Open Ephys folder
   prints a message, shows a message box with the install link, and stops.

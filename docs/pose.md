@@ -41,8 +41,7 @@ pose file to be checked against its length.
 |---|---|
 | Info | Number of frames, duration, and *x*, *y*, likelihood at the current frame |
 | X / Y / P | Show the *x* trace, *y* trace and likelihood (right axis, 0–1) |
-| GetFrameRate | Read the shared frame rate |
-| Frame rate | Type a rate to override it (see [Timing](synchronization.md)) |
+| Frame rate | The shared frame rate. Type a rate to override it; clear it for automatic (see [Timing](synchronization.md)) |
 | Frame | Current frame number |
 | DLC Fix | Open the correction window for the selected body part |
 | Body-part list | The body part to display, correct and overlay on the video |

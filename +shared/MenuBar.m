@@ -35,7 +35,7 @@ classdef MenuBar < handle
             % headers padded with non-breaking spaces (plain ones are trimmed)
             % for wider headers; the Tag names the menu
             fileMenu = uimenu(fig, 'Text', ['File' repmat(char(160), 1, 6)], 'Tag', 'File');
-            shortcuts = {'Open', 'O'; 'Save', 'S'};
+            shortcuts = {'Open', 'O'; 'Open File', 'O'; 'Save', 'S'};
             for k = 1:size(fileItems, 1)
                 callback = fileItems{k,2};
                 item = uimenu(fileMenu, 'Text', fileItems{k,1}, 'Enable', onOff(~isempty(callback)));

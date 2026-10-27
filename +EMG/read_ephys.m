@@ -64,30 +64,19 @@ else
     warning('EMG:units:unscaled','This Open Ephys format has not been calibrated here; displaying raw counts.');
 end
 
-% get trigger event time
+% TTL lines as digital channels (see EMG.ttl_channels); the camera trigger
+% is chosen in the EMG viewer
 events = rec.ttlEvents;
 if isKey(events, key_name)
-    triggers = events(key_name);
-    rising = triggers.state == 1;
-    lines = unique(triggers.line(rising));
-    if numel(lines) > 1
-        labels = cell(numel(lines),1);
-        for k = 1:numel(lines)
-            times = triggers.timestamp(rising & triggers.line == lines(k));
-            labels{k} = sprintf('Ch %d: %d TTL', lines(k), numel(times));
-            intervals = diff(times);
-            intervals = intervals(isfinite(intervals) & intervals > 0);
-            if ~isempty(intervals)
-                labels{k} = sprintf('%s, %.3g Hz', labels{k}, 1/median(intervals));
-            end
-        end
-        [idx, ok] = listdlg('PromptString', 'Select camera TTL line:', ...
-            'ListString', labels, 'SelectionMode', 'single', 'ListSize', [340 200]);
-        if ~ok, lines = []; else, lines = lines(idx); end
-    end
-    if ~isempty(lines)
-        data.trigger.time = triggers.timestamp(rising & triggers.line == lines(1)) ...
-            - recording.metadata.startTimestamp;
+    ttl = events(key_name);
+    lines = unique(ttl.line);
+    start = recording.metadata.startTimestamp;
+    data.digital = struct('name', {}, 'rise', {}, 'fall', {});
+    for k = 1:numel(lines)
+        onLine = ttl.line == lines(k);
+        data.digital(k).name = sprintf('TTL-%02d', lines(k));
+        data.digital(k).rise = sort(ttl.timestamp(onLine & ttl.state == 1) - start);
+        data.digital(k).fall = sort(ttl.timestamp(onLine & ttl.state == 0) - start);
     end
 end
 

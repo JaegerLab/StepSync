@@ -9,7 +9,7 @@ function fig = emg_viewer()
         fig = uifigure('Name', 'EMG Viewer', 'Position', [100 100 1000 500], ...
             'CloseRequestFcn', @onClose);
         data.fig(1).emg = fig;
-        shared.MenuBar(fig, {'Open', @openEMG; 'Open .mat', @openMat; 'Save', @saveEMG});
+        shared.MenuBar(fig, {'Open File', @openFile; 'Open folder', @openFolder; 'Save', @saveEMG});
         drawnow
         grid1 = uigridlayout(fig, ...
             'RowHeight', {30, '1x', 30}, ...
@@ -20,9 +20,11 @@ function fig = emg_viewer()
         %% Row 1: Preprocess group
         subgrid1 = uigridlayout(grid1, [1 6], 'Padding', [0 0 0 0]);
         subgrid1.Layout.Row = 1; subgrid1.Layout.Column = 1;
-        subgrid1.ColumnWidth = {'1x', 120, 100, 100, 110, 30};
+        subgrid1.ColumnWidth = {'1x', 230, 100, 100, 110, 30};
             hd.info = uilabel(subgrid1, 'Text', 'Sample Rate (Hz):');
-            uibutton(subgrid1, 'Text', 'Push Frame Rate', 'ButtonPushedFcn', @pushFrameRate);
+            % camera trigger: digital channels, item 0 is no trigger
+            hd.trigger = uidropdown(subgrid1, 'Items', {'No data'}, 'ItemsData', 0, ...
+                'Enable', 'off', 'ValueChangedFcn', @triggerChanged);
             hd.time = uieditfield(subgrid1,'numeric','Value',0, ...
                     'ValueDisplayFormat', 'time: %.3f s');
             uibutton(subgrid1, 'Text', 'Pre-Process', 'ButtonPushedFcn', @preprocess);
@@ -79,18 +81,42 @@ function fig = emg_viewer()
         notify(data, 'WindowsChanged');
     end
 
-    %% === Load EMG the first time === %%
-    function openEMG(~, ~)
-        hd = data.emg.hd;
-        % open file----------------
-        % == new UI, select the folder, compatible with Open Ephys ===
+    %% === Open a recording folder (Intan or Open Ephys) === %%
+    function openFolder(~, ~)
         pathname = uigetdir(data.defaultPath, 'Select the Directory for EMG data files');
         drawnow; figure(fig);
         if isequal(pathname, 0), return; end
         data.rememberPath(pathname);
+        loadRecording(@()EMG.emg_read(pathname), pathname);
+    end
 
+    %% === Open Intan file(s) or a .mat file written by Save === %%
+    function openFile(~, ~)
+        [files, path] = uigetfile({'*.rhd;*.rhs;*.mat', 'EMG files (*.rhd, *.rhs, *.mat)'}, ...
+            'Open EMG file(s)', data.defaultPath, 'MultiSelect', 'on');
+        drawnow; figure(fig);
+        if isequal(files, 0), return; end
+        files = fullfile(path, cellstr(files));
+        isMat = endsWith(lower(files), '.mat');
+        if any(isMat)
+            if numel(files) > 1
+                uialert(fig, 'Select a single .mat file, or one or more Intan files.', 'Open File');
+                return;
+            end
+            openMat(files{1});
+            return;
+        end
+        data.rememberPath(files{1});
+        displayName = files{1};
+        if numel(files) > 1, displayName = path; end
+        loadRecording(@()EMG.read_intan(files), displayName);
+    end
+
+    %% === Load a recording read by readFcn, replacing the current EMG === %%
+    function loadRecording(readFcn, displayName)
+        hd = data.emg.hd;
         try
-            emgData = EMG.emg_read(pathname);
+            emgData = readFcn();
         catch ME
             drawnow; figure(fig);
             if ismember(ME.identifier, {'EMG:cancelled', 'EMG:missingReader'}), return; end
@@ -104,47 +130,25 @@ function fig = emg_viewer()
         % Update state ---------------
         % reader outputs keep their names; data goes to raw / processed
         data.emg.filename = emgData.files;
-        data.emg.display_name = pathname;
+        data.emg.display_name = displayName;
         data.emg.raw = struct('data', emgData.analog_data, 't', emgData.t, ...
             'sample_rate', emgData.sample_rate);
         data.emg.processed = struct('data', {}, 't', {}, 'sample_rate', {}, 'parameters', {});
         data.emg.analog_channels = emgData.analog_channels;
         data.emg.analog_units = 'uV';
         if isfield(emgData,'analog_units'), data.emg.analog_units = emgData.analog_units; end
+        % digital channels as edge times; the trigger is picked in hd.trigger
+        data.emg.digital = struct('name', {}, 'rise', {}, 'fall', {});
         if isfield(emgData, 'dig_in_data')
             % Intan
-            digital = emgData.dig_in_data;
-            channel = 1;
-            if size(digital, 2) > 1
-                labels = cell(1, size(digital,2));
-                for k = 1:size(digital,2)
-                    times = emgData.t(1 + find(diff(digital(:,k)) > 0.5));
-                    labels{k} = sprintf('Ch %d: %d TTL', k, numel(times));
-                    intervals = diff(times);
-                    intervals = intervals(isfinite(intervals) & intervals > 0);
-                    if ~isempty(intervals)
-                        labels{k} = sprintf('%s, %.3g Hz', labels{k}, 1/median(intervals));
-                    end
-                end
-                [channel, ok] = listdlg('PromptString', 'Select camera TTL channel:', ...
-                    'ListString', labels, 'SelectionMode', 'single', 'ListSize', [340 200]);
-                drawnow; figure(fig);
-                if ~ok, channel = []; end
+            names = {};
+            if isfield(emgData, 'dig_in_channels')
+                names = {emgData.dig_in_channels.native_channel_name};
             end
-            if ~isempty(channel)
-                data.emg.trigger.data = digital(:,channel);
-                data.emg.trigger.time = emgData.t(1 + find(diff(digital(:,channel)) > 0.5));
-            end
-        elseif isfield(emgData, 'trigger')
+            data.emg.digital = EMG.ttl_channels(emgData.t, emgData.dig_in_data, names);
+        elseif isfield(emgData, 'digital')
             % Open Ephys
-            data.emg.trigger = emgData.trigger;
-        end
-        if isfield(data.emg, 'trigger')
-            intervals = diff(data.emg.trigger.time);
-            intervals = intervals(isfinite(intervals) & intervals > 0);
-            data.emg.trigger.freq = NaN;
-            if ~isempty(intervals), data.emg.trigger.freq = 1/median(intervals); end
-            data.emg.trigger.number = numel(data.emg.trigger.time);
+            data.emg.digital = emgData.digital;
         end
 
         hd.datatype.Items = EMG.emg_types(data.emg);
@@ -158,19 +162,15 @@ function fig = emg_viewer()
 
     %% === Open a .mat file written by Save === %%
     % Replaces the current EMG entirely. Raw data can be left out.
-    function openMat(~, ~)
-        [file, path] = uigetfile(fullfile(data.defaultPath, '*.mat'), 'Open EMG .mat file');
-        drawnow; figure(fig);
-        if isequal(file, 0), return; end
-        filename = fullfile(path, file);
+    function openMat(filename)
         try
             [names, bytes] = EMG.emg_file_contents(filename);
         catch ME
-            uialert(fig, ME.message, 'Open .mat');
+            uialert(fig, ME.message, 'Open File');
             return;
         end
         if isempty(names)
-            uialert(fig, 'The file contains no EMG data.', 'Open .mat');
+            uialert(fig, 'The file contains no EMG data.', 'Open File');
             return;
         end
         labels = arrayfun(@(k)sprintf('%s (%.1f MB)', names{k}, bytes(k)/2^20), ...
@@ -312,6 +312,7 @@ function fig = emg_viewer()
     % data is saved in SessionData. No need to repeat reading for update.
     function updateInfo()
         if ~isfield(data.emg, 'hd'), return; end
+        updateTriggerList();
         if ~data.has('emg')
             % all data deleted: the metadata (trigger) is kept
             if isfield(data.emg, 'analog_channels'), data.emg.hd.info.Text = 'No EMG data.'; end
@@ -324,7 +325,7 @@ function fig = emg_viewer()
             triggerInfo = sprintf('Trigger#: %d, Freq: %.2f Hz', ...
                 data.emg.trigger.number, data.emg.trigger.freq);
         else
-            triggerInfo = "Camera trigger not found.";
+            triggerInfo = "No camera trigger selected.";
         end
 
         % Update UI -------------------
@@ -352,10 +353,72 @@ function fig = emg_viewer()
             triggerInfo);
     end
 
-    function pushFrameRate(~,~)
-        if isfield(data.emg, 'trigger') && isfinite(data.emg.trigger.freq) && data.emg.trigger.freq > 0
-            data.setFrameRate(data.emg.trigger.freq);
+    %% === Camera trigger === %%
+    % Items: 'Select trigger channel' (0, no trigger), then one per digital channel.
+    function updateTriggerList()
+        hd = data.emg.hd;
+        if ~isfield(data.emg, 'digital')
+            if isfield(data.emg, 'trigger')
+                % a file saved before the channel list was kept
+                set(hd.trigger, 'Items', {sprintf('Trigger: %d TTL, %.4g Hz', ...
+                    data.emg.trigger.number, data.emg.trigger.freq)}, 'ItemsData', 0, 'Enable', 'off');
+            else
+                set(hd.trigger, 'Items', {'No data'}, 'ItemsData', 0, 'Enable', 'off');
+            end
+            return;
         end
+        if isempty(data.emg.digital)
+            set(hd.trigger, 'Items', {'No digital channel'}, 'ItemsData', 0, 'Enable', 'off');
+            return;
+        end
+        labels = arrayfun(@EMG.ttl_stats, data.emg.digital, 'UniformOutput', false);
+        set(hd.trigger, 'Items', [{'Select trigger channel'} labels], ...
+            'ItemsData', 0:numel(labels), 'Enable', 'on');
+        selected = 0;
+        if isfield(data.emg, 'trigger') && isfield(data.emg.trigger, 'channel')
+            selected = find(strcmp(data.emg.trigger.channel, {data.emg.digital.name}), 1);
+            if isempty(selected), selected = 0; end
+        end
+        hd.trigger.Value = selected;
+    end
+
+    % Use the selected digital channel as the camera trigger: one rising
+    % edge per frame of the open video, DLC and gait data (one may be extra).
+    function triggerChanged(src, evt)
+        k = src.Value;
+        if k == 0
+            if isfield(data.emg, 'trigger'), data.emg = rmfield(data.emg, 'trigger'); end
+        else
+            channel = data.emg.digital(k);
+            [~, s] = EMG.ttl_stats(channel);
+            msg = '';
+            if s.number < 2 || isnan(s.freq)
+                msg = sprintf(['%s has %d TTL pulse(s), so it is not a camera trigger. ' ...
+                    'A camera trigger has one pulse per frame.'], channel.name, s.number);
+            else
+                counts = data.frameCounts();
+                modules = fieldnames(counts);
+                bad = modules(cellfun(@(m)abs(counts.(m) - s.number) > 1, modules));
+                if ~isempty(bad)
+                    frames = cellfun(@(m)sprintf('%s: %d frames', upper(m), counts.(m)), ...
+                        bad, 'UniformOutput', false);
+                    msg = sprintf(['%s has %d TTL pulses, but the open data has a different ' ...
+                        'number of frames (%s). A camera trigger has one pulse per frame.'], ...
+                        channel.name, s.number, strjoin(frames, ', '));
+                end
+            end
+            if ~isempty(msg)
+                src.Value = evt.PreviousValue;
+                uialert(fig, msg, 'Cannot synchronize');
+                return;
+            end
+            data.emg.trigger = struct('channel', channel.name, 'time', channel.rise, ...
+                'freq', s.freq, 'number', s.number);
+            % choosing a trigger replaces a typed-in frame rate
+            data.frameRate = 0;
+        end
+        notify(data, 'InfoChanged');
+        notify(data, 'TimeChanged');
     end
 
     %% main update
@@ -418,6 +481,7 @@ function fig = emg_viewer()
                 steps.t, y, ...
                 'Marker', 'o', 'MarkerEdgeColor', 'm', 'LineWidth', 2, 'HitTest', 'off');
             hd.stepMarker.Visible = 'on';
+            uistack(hd.stepMarker, "top");
         elseif isfield(hd, 'stepMarker') && isgraphics(hd.stepMarker)
             hd.stepMarker.Visible = 'off';
         end

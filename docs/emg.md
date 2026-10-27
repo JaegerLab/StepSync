@@ -7,13 +7,15 @@ Its preprocessing step prepares the signals for the step-triggered average.
 
 ## Opening a recording
 
-`File > Open` (Ctrl+O) asks for a **folder**. StepSync detects the format
-from the folder contents.
+- `File > Open File` (Ctrl+O) selects one or more `.rhd`/`.rhs` files, or a
+  single `.mat` file written by Save (see [Saving and reopening](#saving-and-reopening)).
+- `File > Open folder` asks for a **folder**. StepSync detects the format
+  from the folder contents.
 
 ### Intan (`.rhd`, `.rhs`)
 
-- Every `.rhd`/`.rhs` file in the folder is read and joined in file-name
-  order. Intan's software splits long recordings into consecutive files, and
+- The selected files, or every `.rhd`/`.rhs` file in the folder, are read and
+  joined in file-name order. Intan's software splits long recordings into consecutive files, and
   they are put back together this way.
 - All files must have the same sample rate and channels. A warning appears if
   there is a gap between consecutive files.
@@ -35,19 +37,20 @@ on the path; StepSync shows a message if it is missing.
 
 ### Camera trigger
 
-After reading, StepSync looks for the camera TTL line. If there is more than
-one, it lists them with their pulse counts and frequencies (see
+After reading, the trigger menu lists the digital channels with their pulse
+counts, widths and rates, e.g. `DIN-00: 30900 TTL, 10 ms, 100 Hz`. Choose the
+camera line to synchronize the frames (see
 [Timing and synchronization](synchronization.md)). The info line then shows,
 for example, `Rate: 20000 Hz, Length: 600.00 s` and
-`Trigger#: 59990, Freq: 100 Hz`. If no trigger was found, it says
-`Camera trigger not found.`
+`Trigger#: 59990, Freq: 100 Hz`. Until a channel is chosen, it says
+`No camera trigger selected.`
 
 ## Controls
 
 | Control | Action |
 |---|---|
 | Info | Sample rate and length of the selected data type, and the trigger count and frequency |
-| Push Frame Rate | Use the measured TTL frequency as the shared frame rate |
+| Trigger menu | The digital channel that carries the camera trigger; `Select trigger channel` for none |
 | time | Cursor time; type a value to jump |
 | Pre-Process | Open the preprocessing window |
 | Data type | `Raw`, `Processed 1`, `Processed 2`, … |
@@ -87,15 +90,20 @@ below for `Raw`. Selecting another type also discards the preview.
 
 | Setting | Default | Description |
 |---|---|---|
-| High Pass | on, 500 Hz | 4th-order IIR (Butterworth) high-pass at the given half-power frequency |
-| FiltFilt | off | Filter forwards and backwards (zero phase) instead of a causal filter |
+| Filter | on, High pass | 4th-order IIR (Butterworth): High pass, Low pass, Band pass or Band stop |
+| High | 500 Hz | High-pass half-power frequency; a band edge for Band pass and Band stop |
+| Low | 5000 Hz | Low-pass half-power frequency; a band edge for Band pass and Band stop |
+| Filtfilt | off | Filter forwards and backwards (zero phase) instead of a causal filter |
 | Rectify | on | Absolute value |
-| Down Sample | on, 200 Hz | Smooth, then keep every *n*-th sample |
+| Down Sample | on, 200 Hz | Smooth, then resample at exactly the given sample rate |
 
-When down-sampling, the factor is *n* = round(*fs* / target rate). Before
-decimation the signal is smoothed with a moving average of 2.5 *n* samples,
-which acts as an envelope and anti-aliasing filter. The achieved rate is
-*fs* / *n*, so it can differ slightly from the value entered. Samples before
+Only the settings that apply are enabled: Filtfilt and the filter type need
+Filter, High pass uses only High, Low pass only Low, and the band filters both.
+
+When down-sampling, the signal is first smoothed with a moving average of
+2.5 *fs* / rate samples, which acts as an envelope and anti-aliasing filter.
+It is then linearly interpolated at multiples of 1 / rate from time 0, so
+the new rate is exactly the value entered. Samples before
 time 0 are removed.
 
 - **Preview** processes the selected channel only and draws it in yellow.
@@ -118,6 +126,6 @@ while the preprocessing window is open.
 ## Saving and reopening
 
 `File > Save` writes chosen data types to a `.mat` file, for the full length
-or the current zoom window. `File > Open .mat` reads it back. You can leave
+or the current zoom window. `File > Open File` reads it back. You can leave
 out the raw data when opening to save memory. See
 [Sessions and files](files.md#emg-files).

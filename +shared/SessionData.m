@@ -70,36 +70,54 @@ classdef SessionData < handle
             end
         end
 
+        % A typed-in rate overrides the automatic one; [] or 0 returns to automatic.
         function setFrameRate(obj, value)
-            validateattributes(value, {'numeric'}, {'scalar','real','finite','positive'});
+            if isempty(value), value = 0; end
+            validateattributes(value, {'numeric'}, {'scalar','real','finite','nonnegative'});
             obj.frameRate = double(value);
             notify(obj, 'InfoChanged');
             notify(obj, 'TimeChanged');
         end
 
         % Manual override > valid camera TTL rate > video rate > frame units.
-        function frameRate = getFrameRate(obj)
+        %   source: 'manual' | 'trigger' | 'video' | 'none'
+        function [frameRate, source] = getFrameRate(obj)
             frameRate = obj.frameRate;
+            source = 'manual';
             if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
             % the trigger counts even when all EMG data was deleted
+            source = 'trigger';
             if isfield(obj.emg, 'trigger') && isfield(obj.emg.trigger, 'freq')
                 frameRate = obj.emg.trigger.freq;
                 if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
             end
             if obj.has('video')
                 frameRate = obj.video.vid.FrameRate;
+                source = 'video';
             else
                 frameRate = 1;
+                source = 'none';
             end
         end
 
+        % Trigger times while the trigger sets the rate; a typed-in rate
+        % overrides them too (e.g. when the triggers are wrong).
         function t = getFrameTimes(obj, nFrames)
+            [frameRate, source] = obj.getFrameRate();
             triggers = [];
-            if isfield(obj.emg, 'trigger') && ...
-                    isfield(obj.emg.trigger, 'time') && numel(obj.emg.trigger.time) >= 2
+            if strcmp(source, 'trigger') && isfield(obj.emg.trigger, 'time') && ...
+                    numel(obj.emg.trigger.time) >= 2
                 triggers = obj.emg.trigger.time;
             end
-            t = shared.frame_times(nFrames, obj.getFrameRate(), triggers);
+            t = shared.frame_times(nFrames, frameRate, triggers);
+        end
+
+        % Frame counts of the open frame-based data, by module.
+        function counts = frameCounts(obj)
+            counts = struct();
+            if obj.has('video'), counts.video = obj.video.vid.NumFrames; end
+            if obj.has('dlc'), counts.dlc = height(obj.dlc.table); end
+            if obj.has('gait'), counts.gait = numel(obj.gait.paw(1).raw_x); end
         end
 
         % Notify DLCChanged with what changed.

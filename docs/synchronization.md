@@ -10,17 +10,19 @@ line up with the EMG samples recorded at the same moment.
 The recommended setup records the camera's exposure trigger on a digital
 input of the EMG system. Each TTL rising edge marks one video frame.
 
-When the EMG is opened, StepSync finds the rising edges on the chosen digital
-line:
+When the EMG is opened, its digital inputs are listed in the trigger menu of
+the EMG viewer:
 
-- **Intan:** the board digital inputs. If there is more than one, a dialog
-  lists each channel as `Ch k: N TTL, F Hz`, so the camera line is easy to
-  recognise by its pulse count and rate.
-- **Open Ephys:** the TTL event lines of the selected stream, listed in the
-  same way.
+- **Intan:** the board digital inputs, e.g. `DIN-00`.
+- **Open Ephys:** the TTL event lines of the selected stream, e.g. `TTL-01`.
 
-With one line, it is used automatically. If you cancel the dialog, no
-trigger is used.
+Each item shows the pulse count, the median pulse width and the rate
+(1 / median interval between pulses), for example
+`DIN-00: 30900 TTL, 10 ms, 100 Hz` or `DIN-01: 1 TTL, 900 s, - Hz`, so the
+camera line is easy to recognise. The menu reads `Select trigger channel`
+until you choose one, `No digital channel` if the recording has none, and
+`No data` before a recording is opened. Choosing `Select trigger channel`
+again removes the trigger.
 
 Frame *k* is then placed at the time of the *k*-th TTL pulse. This removes
 drift between the camera and the acquisition system and needs no assumption
@@ -29,29 +31,35 @@ about the frame rate.
 - The number of frames and the number of TTL pulses may differ by at most
   one. Cameras often record one extra frame or miss the last pulse. A final
   frame with no pulse gets no time and is excluded from analysis.
-- A larger mismatch is reported as an error, because the frames could no
-  longer be matched to pulses reliably. Check that the right TTL line was
-  chosen and that the video and pose files cover the same recording.
+- A channel with fewer than two pulses, or with a pulse count that does not
+  match the open video, DLC or gait data, is refused with a message and the
+  previous choice is kept. Check that the right line was chosen and that the
+  video and pose files cover the same recording.
 - The TTL times stay in use even if you later delete all EMG data types.
 
-<!-- SCREENSHOT: docs/images/ttl-dialog.png. The camera TTL channel dialog showing pulse counts and frequencies. -->
+<!-- SCREENSHOT: docs/images/ttl-menu.png. The EMG trigger menu showing pulse counts, widths and rates. -->
 
-## Without TTL pulses
+## Frame rate
 
-If no camera trigger is available, frame *k* is placed at *k* / frame rate
-seconds, so frame 1 is at 1/frame rate, not 0. The frame rate is taken from
-the first available of:
+Without a trigger, frame *k* is placed at *k* / frame rate seconds, so frame
+1 is at 1/frame rate, not 0. The frame rate is taken from the first available
+of:
 
 1. a rate typed into the frame rate box of the Video, DLC or Gait viewer;
-2. the TTL frequency (1 / median interval between pulses);
+2. the TTL frequency of the chosen trigger channel;
 3. the frame rate stored in the video file;
 4. 1 Hz. In this case the DLC viewer labels its axis "Frame" rather than
    "Time (s)".
 
-**Push Frame Rate** in the EMG viewer copies the measured TTL frequency into
-the shared frame rate. The frame rate is used for conversions such as speed
-(cm/s) and minimum step intervals. When TTL times exist, frame times always
-come from the TTLs.
+The frame rate box shows `Frame rate: … Hz` in every viewer and updates
+whenever a module is opened. An automatic rate (2–4) is shown in italics; the
+tooltip says where it comes from. Clear the box or type 0 to return to the
+automatic rate.
+
+A typed-in rate also replaces the trigger times: frames are then placed at
+*k* / frame rate even when a trigger is chosen. Use it when the triggers are
+wrong. Choosing a trigger channel clears a typed-in rate. The frame rate is
+also used for conversions such as speed (cm/s) and minimum step intervals.
 
 ## Moving between time and frames
 

@@ -43,10 +43,10 @@ the current **zoom window**. The default file name ends in `_StepSync` (or
 | `fileFormat`, `formatVersion` | `'StepSync EMG'`, `1` |
 | `emg` | Channel names and units, camera trigger, channel map, source, `time_range` (empty for full length) |
 | `raw` | `data` (samples × channels), `t` (s), `sample_rate` (Hz) |
-| `processed1`, `processed2`, … | As `raw`, plus `parameters`: `HighPassFreq`, `FiltFilt`, `Rectify`, `DownSampleRate`, `Source` |
+| `processed1`, `processed2`, … | As `raw`, plus `parameters`: `FilterType`, `HighPassFreq`, `LowPassFreq`, `FiltFilt`, `Rectify`, `DownSampleRate`, `Source` |
 
 Times are on the original recording clock, also in a zoom-window save.
-`File > Open .mat` lists the stored types with their sizes, so you can load
+EMG `File > Open File` with a `.mat` file lists the stored types with their sizes, so you can load
 only what you need.
 
 ### Pose files
@@ -97,7 +97,8 @@ StepSync. Main fields:
 | `data.frameRate`, `data.currentTime`, `data.currentZoom` | Shared state |
 | `data.getFrameTimes(n)` | Times (s) of video frames 1…n |
 | `data.emg.raw`, `data.emg.processed(k)` | `data`, `t`, `sample_rate` (and `parameters`) |
-| `data.emg.trigger` | Camera TTL `time`, `freq`, `number` |
+| `data.emg.digital` | Digital channels: `name`, `rise`, `fall` edge times |
+| `data.emg.trigger` | Chosen camera TTL: `channel`, `time`, `freq`, `number` |
 | `data.dlc.table` | Pose table: `<part>_x`, `<part>_y`, `<part>_likelihood` |
 | `data.dlc.t` | Time of each pose frame |
 | `data.gait.t` | Time of each gait frame |

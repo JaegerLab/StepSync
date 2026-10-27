@@ -21,7 +21,7 @@ the copy it has.
 
 | Control | Default | Description |
 |---|---|---|
-| Frame rate | — | The shared frame rate. Type a rate to override it, e.g. when analysing a DLC file without video or EMG (see [Timing](synchronization.md)) |
+| Frame rate | — | The shared frame rate. Type a rate to override it, or clear it for automatic, e.g. when analysing a DLC file without video or EMG (see [Timing](synchronization.md)) |
 | Resolution | 30 px/cm | Converts pixels to centimetres |
 | Trace | X | `X`, `Y` (cm) or `Speed` (cm/s) |
 | Paw thresh | automatic | Threshold for the selected paw and trace |

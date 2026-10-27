@@ -20,7 +20,7 @@ function fig = dlc_viewer()
         %% Row 1: DLC processing
         subgrid1 = uigridlayout(grid1, [1 7], 'Padding', [0 0 0 0], ...
             'Layout', matlab.ui.layout.GridLayoutOptions('Row', 1, 'Column', 1));
-        subgrid1.ColumnWidth = {'1x', 30, 30, 30, 100, 80, 100};
+        subgrid1.ColumnWidth = {'1x', 30, 30, 30, 150, 100};
             hd.info = uilabel(subgrid1,'Text',' Info:', 'BackgroundColor','w');
             hd.chk_x = uicheckbox(subgrid1,'Text','X','Value',1, ...
                 'ValueChangedFcn', @checkXChanged);
@@ -28,10 +28,7 @@ function fig = dlc_viewer()
                 'ValueChangedFcn', @checkYChanged);
             hd.chk_p = uicheckbox(subgrid1,'Text','P','Value',0, ...
                 'ValueChangedFcn', @checkPChanged);
-            uibutton(subgrid1,'Text','GetFrameRate', 'ButtonPushedFcn',@getFrameRate);
-            hd.frameRate = uieditfield(subgrid1,'numeric','Value',1, ...
-                'Limits', [0 Inf], 'LowerLimitInclusive', 'off', ...
-                'ValueDisplayFormat','%.2f Hz','ValueChangedFcn', @frameRateChanged);
+            hd.frameRate = shared.frame_rate_field(subgrid1);
             hd.currentFrame = uieditfield(subgrid1,'numeric','Value',1, ...
                 'ValueDisplayFormat','Frame: %d');
             
@@ -463,33 +460,19 @@ function fig = dlc_viewer()
         end
     end
 
-    % button callback
-    function getFrameRate(~,~)
-        frameRate = data.getFrameRate();
-        data.dlc.hd.frameRate.Value = frameRate;
-        updateFrameRate(frameRate);
-    end
-
-    % manually change frame rate edit field.
-    function frameRateChanged(src,~)
-        data.setFrameRate(src.Value);
-    end
-
     function updateFrameRate(frameRate)
         hd = data.dlc.hd;
         totalFrame = height(data.dlc.table);
         data.dlc.t = data.getFrameTimes(totalFrame);
 
-        hd.frameRate.Value = frameRate;
-
-        showBodypart();             % redraw trace and fix layers on new time base
+        showBodypart();            % redraw trace and fix layers on new time base
 
         % update xlims if it's out of bound
         xlims = xlim(hd.ax);
         xlims = [max(xlims(1), data.dlc.t(1)) min(xlims(2), max(data.dlc.t, [], 'omitnan'))];
         if xlims(2) > xlims(1), xlim(hd.ax, xlims); end
         
-        if hd.frameRate.Value == 1
+        if frameRate == 1
             xlabel(hd.ax, 'Frame')
         else
             xlabel(hd.ax, 'Time (s)')

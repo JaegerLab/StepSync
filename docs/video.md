@@ -17,7 +17,7 @@ the file name.
 | Control | Action |
 |---|---|
 | Info | Frame size and number of frames |
-| FrameRate | The shared frame rate (see [Timing](synchronization.md)). Typing a value overrides the measured rate |
+| Frame rate | The shared frame rate (see [Timing](synchronization.md)). Type a rate to override it; clear it for automatic |
 | time | Cursor time in seconds; type a value to jump |
 | frame | Current frame number; type a value to jump |
 | `<` / `>` | Step back / forward by the step size |

@@ -9,7 +9,7 @@ function fig = gait_viewer()
     function drawGUI()
         hd = struct;
         % gait viewer window with uigridlayout
-        fig = uifigure('Name', 'StepSync Gait', 'Position', [100 100 1000 500], ...
+        fig = uifigure('Name', 'StepSync Gait', 'Position', shared.window_position('gait', [100 100 1000 500]), ...
             'CloseRequestFcn',@onClose);
         data.fig(1).gait = fig;
         shared.MenuBar(fig, {'Open', @openGait; 'Import Pose', @importPaws; 'Save', @saveGait});
@@ -787,6 +787,7 @@ function fig = gait_viewer()
     % close function =================================
     function onClose(src,~)
         if ~shared.confirm_close(fig, 'gait'), return; end
+        shared.remember_position('gait', fig);
         hd = data.gait.hd;
 
         % Clear data and graphic handles first

@@ -84,3 +84,47 @@ verifyEqual(testCase, S.defaultPath, fileparts(fullfile(tempdir, 'x')));
 S.rememberPath(fullfile(tempdir, 'no_such_folder', 'file.csv'));   % ignored
 verifyEqual(testCase, S.defaultPath, fileparts(fullfile(tempdir, 'x')));
 end
+
+function keepPositionPrefs(testCase)
+% the tests below change the saved window positions; put the user's back
+had = ispref('StepSync', 'windowPositions');
+if had, old = getpref('StepSync', 'windowPositions'); else, old = []; end
+addTeardown(testCase, @()restorePositionPrefs(had, old));
+if had, rmpref('StepSync', 'windowPositions'); end
+end
+
+function restorePositionPrefs(had, old)
+if had
+    setpref('StepSync', 'windowPositions', old);
+elseif ispref('StepSync', 'windowPositions')
+    rmpref('StepSync', 'windowPositions');
+end
+end
+
+function testWindowPositionRemembered(testCase)
+keepPositionPrefs(testCase);
+monitors = [1 1 1920 1080; 1921 1 1280 1024];
+default = [100 100 1000 500];
+verifyEqual(testCase, shared.window_position('pose', default, monitors), default);
+fig = figure('Visible', 'off', 'Position', [2100 300 800 400]);
+addTeardown(testCase, @()delete(fig));
+shared.remember_position('pose', fig);
+verifyEqual(testCase, shared.window_position('pose', default, monitors), [2100 300 800 400]);
+verifyEqual(testCase, shared.window_position('gait', default, monitors), default);
+% second monitor gone: moved onto the remaining one
+verifyEqual(testCase, shared.window_position('pose', default, monitors(1,:)), ...
+    [1920-800+1, 300, 800, 400]);
+end
+
+function testWindowPositionIgnoresBadPrefs(testCase)
+keepPositionPrefs(testCase);
+default = [100 100 1000 500];
+setpref('StepSync', 'windowPositions', 'junk');
+verifyEqual(testCase, shared.window_position('ephys', default), default);
+setpref('StepSync', 'windowPositions', struct('ephys', [1 2 0 5]));
+verifyEqual(testCase, shared.window_position('ephys', default), default);
+fig = figure('Visible', 'off', 'Position', [200 200 600 300]);
+addTeardown(testCase, @()delete(fig));
+shared.remember_position('ephys', fig);   % replaces the junk entry
+verifyEqual(testCase, shared.window_position('ephys', default, [1 1 1920 1080]), [200 200 600 300]);
+end

@@ -5,7 +5,7 @@ function fig = pose_viewer()
 
     function drawGUI()
         % Pose viewer window with uigridlayout
-        fig = uifigure('Name', 'StepSync Pose', 'Position', [100 100 1000 500], ...
+        fig = uifigure('Name', 'StepSync Pose', 'Position', shared.window_position('pose', [100 100 1000 500]), ...
             'CloseRequestFcn', @onClose);
         data.fig(1).pose = fig;
         shared.MenuBar(fig, {'Open', @openPose; 'Save', @savePose});
@@ -671,6 +671,7 @@ function fig = pose_viewer()
     % close function =================================
     function onClose(src,~)
         if ~shared.confirm_close(fig, 'pose'), return; end
+        shared.remember_position('pose', fig);
         hd=data.pose.hd;
         % close fix GUI first.
         if isfield(hd, 'fixGUI') && isgraphics(hd.fixGUI)

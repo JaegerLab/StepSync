@@ -10,7 +10,7 @@ drawGUI();
 
 function drawGUI()
     % Main UI figure with grid layout
-    fig = uifigure('Name', 'StepSync Video', 'Position', [100 100 600 600], ...
+    fig = uifigure('Name', 'StepSync Video', 'Position', shared.window_position('video', [100 100 600 600]), ...
         'CloseRequestFcn', @onClose);
     data.fig(1).video = fig;
     shared.MenuBar(fig, {'Open', @openVideo; 'Save', @saveVideo});
@@ -559,6 +559,7 @@ end
 
 function onClose(~,~)
     if ~shared.confirm_close(fig, 'video'), return; end
+    shared.remember_position('video', fig);
     % During an export: finalize the file now. The export loop resumes only
     % after this returns, possibly after Exit all deleted the session.
     if exportState.running

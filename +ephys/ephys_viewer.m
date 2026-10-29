@@ -6,7 +6,7 @@ function fig = ephys_viewer()
 
     function drawGUI()
         % Ephys viewer window with uigridlayout
-        fig = uifigure('Name', 'StepSync Ephys', 'Position', [100 100 1000 500], ...
+        fig = uifigure('Name', 'StepSync Ephys', 'Position', shared.window_position('ephys', [100 100 1000 500]), ...
             'CloseRequestFcn', @onClose);
         data.fig(1).ephys = fig;
         shared.MenuBar(fig, {'Open File', @openFile; 'Open folder', @openFolder; 'Save', @saveEphys});
@@ -633,6 +633,7 @@ function fig = ephys_viewer()
     % close function
     function onClose(~,~)
         if ~shared.confirm_close(fig, 'ephys'), return; end
+        shared.remember_position('ephys', fig);
         hd = data.ephys.hd;
         % Clear all the handles and plots;
         field = fields(hd);

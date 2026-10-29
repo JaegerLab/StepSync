@@ -23,19 +23,19 @@ addpath('C:\path\to\StepSync')
 ## Starting StepSync
 
 ```matlab
-StepSync('D:\my_data')
+StepSync
+StepSync('D:\my_data')   % Use data location as an optional argument.
 ```
 
-The argument is the folder where file dialogs first open. After that,
-StepSync remembers the folder of the last file you opened or saved. Calling
-`StepSync` with no argument opens the dialogs in a lab-specific default
-folder, so it is best to pass your own.
+The optional argument is the folder where file dialogs first open. After that,
+StepSync remembers the folder of the last file you opened or saved. If StepSync 
+windows are already open, running `StepSync` again brings them to the front.
 
 <!-- SCREENSHOT: docs/images/launcher.png. The launcher window with its four buttons. -->
 
 The launcher has one button per module: **Video**, **Ephys**, **Pose**
-and **Gait**. Opening a module closes the launcher. If StepSync windows are
-already open, running `StepSync` again brings them to the front.
+and **Gait**. Opening a module closes the launcher. After that, launch other modules 
+from the Window menu (see below). 
 
 ## Windows and menus
 
@@ -62,8 +62,8 @@ Every module window has the same menu bar.
 
 | Item | Shortcut |
 |---|---|
-| Video | Ctrl+I |
 | Ephys | Ctrl+E |
+| Video | Ctrl+I |
 | Pose | Ctrl+P |
 | Gait | Ctrl+G |
 | Open All | Ctrl+A |
@@ -77,11 +77,17 @@ macOS the shortcuts use Cmd instead of Ctrl.
 When the last module window closes, the session ends and its data is cleared.
 Save the session first if you need it.
 
+Each module window reopens where it was last closed, also after MATLAB
+restarts. The positions are kept in the MATLAB preferences (group
+`StepSync`); `rmpref('StepSync')` resets them. A window last closed on a
+monitor that is no longer connected opens on the nearest one. Loading a
+session places the windows where the session saved them.
+
 The Ephys, Pose and Gait viewers all have these buttons below their plot:
 
 | Button | Action |
 |---|---|
-| 🔍︎+ / 🔍︎- | Halve / double the zoom window around the cursor |
+| 🔍︎+ / 🔍︎- | Halve / double the zoom window around the cursor, on the X axis only |
 | ⭯ Refresh | Show the full recording and reset the vertical axis |
 | [➜ Pop out | Copy the plot into an ordinary MATLAB figure, for export or editing |
 

@@ -9,10 +9,10 @@ classdef MenuBar < handle
 %                     (default true)
 %
 %   File:   <fileItems> | Load session, Save session, Export to Workspace | Close, Exit all
-%   Window: Video, EMG, DLC, Gait (open sub-windows listed below their module) | Open All, Bring All to Top
+%   Window: Ephys, Video, Pose, Gait (open sub-windows listed below their module) | Open All, Bring All to Top
 %
-% Shortcuts: Ctrl+O Open, Ctrl+S Save, Ctrl+W Close, Ctrl+I Video, Ctrl+E EMG,
-% Ctrl+D DLC, Ctrl+G Gait, Ctrl+A Open All, Ctrl+T Bring All to Top.
+% Shortcuts: Ctrl+O Open, Ctrl+S Save, Ctrl+W Close, Ctrl+E Ephys, Ctrl+I Video,
+% Ctrl+P Pose, Ctrl+G Gait, Ctrl+A Open All, Ctrl+T Bring All to Top.
 %
 % The object lives as long as its window and rebuilds the Window menu on
 % WindowsChanged. It does not need to be stored.
@@ -71,9 +71,9 @@ classdef MenuBar < handle
             if ~isgraphics(obj.WindowMenu), return; end
             delete(obj.WindowMenu.Children);
             windows = shared.open_windows();
-            modules = {'video', 'emg', 'dlc', 'gait'};
-            labels  = {'Video', 'EMG', 'DLC', 'Gait'};
-            keys    = {'I', 'E', 'D', 'G'};
+            modules = {'ephys', 'video', 'pose', 'gait'};
+            labels  = {'Ephys', 'Video', 'Pose', 'Gait'};
+            keys    = {'E', 'I', 'P', 'G'};
             indent = repmat(char(160), 1, 4);   % plain spaces are trimmed
             for k = 1:numel(modules)
                 module = modules{k};

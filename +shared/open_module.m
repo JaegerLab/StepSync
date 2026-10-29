@@ -1,7 +1,7 @@
 function fig = open_module(module)
 % fig = shared.open_module(module)
 % Open a module window, or bring it to the front if it is open, and close
-% the launcher. module: 'video' | 'emg' | 'dlc' | 'gait' (any case).
+% the launcher. module: 'video' | 'ephys' | 'pose' | 'gait' (any case).
 
     module = lower(module);
     data = shared.SessionData.instance();
@@ -10,10 +10,10 @@ function fig = open_module(module)
         figure(fig);
     else
         switch module
-            case 'video', fig = VIDEO.video_viewer();
-            case 'emg',   fig = EMG.emg_viewer();
-            case 'dlc',   fig = DLC.dlc_viewer();
-            case 'gait',  fig = GAIT.gait_viewer();
+            case 'video', fig = video.video_viewer();
+            case 'ephys',   fig = ephys.ephys_viewer();
+            case 'pose',   fig = pose.pose_viewer();
+            case 'gait',  fig = gait.gait_viewer();
             otherwise
                 error('StepSync:module', 'Unknown module: %s', module);
         end

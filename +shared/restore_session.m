@@ -8,7 +8,7 @@ function restore_session(saved)
     % close without per-window prompts and without resetting the session
     data.closingAll = true;
     restore = onCleanup(@()stopClosingAll(data));
-    for name = {'gait','video','dlc','emg'}
+    for name = {'gait','video','pose','ephys'}
         if isfield(data.fig, name{1}) && isgraphics(data.fig.(name{1}), 'figure')
             close(data.fig.(name{1}));
         end
@@ -36,8 +36,8 @@ function restore_session(saved)
     % activate data display in each module
     % (gait recalculates on InfoChanged and then publishes GaitChanged)
     notify(data, 'InfoChanged');
-    notify(data, 'EMGChanged');
-    data.notifyDLC('load');
+    notify(data, 'EphysChanged');
+    data.notifyPose('load');
     % Assignments above do not emit events, and redrawing may have changed the
     % zoom: synchronize restored views explicitly. Zoom first, because viewers
     % pan from their axis limits on TimeChanged.

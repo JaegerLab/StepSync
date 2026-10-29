@@ -1,6 +1,6 @@
 # Step-triggered average
 
-The step-triggered average (STA) is the mean EMG around each step event. It
+The step-triggered average (STA) is the mean ephys signal (for example rectified EMG) around each step event. It
 is compared with the average expected by chance, which shows whether a
 muscle's activity is locked to the step cycle.
 
@@ -10,8 +10,8 @@ muscle's activity is locked to the step cycle.
 
 The STA uses the current selections in the other viewers:
 
-- **EMG:** the data type (`Raw` or `Processed N`) and channel selected in the
-  [EMG viewer](emg.md). Rectified, down-sampled data (the default
+- **Ephys:** the data type (`Raw` or `Processed N`) and channel selected in the
+  [Ephys viewer](ephys.md). Rectified, down-sampled data (the default
   preprocessing) gives the average muscle activation envelope.
 - **Events:** the paw, trace and event type selected in the
   [Gait viewer](gait.md). Masked periods contain no events.
@@ -29,24 +29,24 @@ click **Plot**.
 
 ## Computation
 
-Each event time is converted to the nearest EMG sample on the shared clock
+Each event time is converted to the nearest ephys sample on the shared clock
 (see [Timing and synchronization](synchronization.md)). Time 0 is the event,
-and positive lags are after it. Events outside the EMG recording are dropped
-with a warning. The EMG must be evenly sampled.
+and positive lags are after it. Events outside the ephys recording are dropped
+with a warning. The signal must be evenly sampled.
 
 At each lag, the average is taken over the events whose sample at that lag
 exists:
 
-  STA(τ) = Σₑ EMG(tₑ + τ) / Nₑ(τ)
+  STA(τ) = Σₑ x(tₑ + τ) / Nₑ(τ)
 
-where Nₑ(τ) counts the events with a valid EMG sample at lag τ. Events near
+where Nₑ(τ) counts the events with a valid sample at lag τ. Events near
 the start or end of the recording, or next to missing samples, therefore
 contribute only where they have data. Missing samples are never treated as
 zeros. If two events fall on the same sample, both are counted.
 
 ## Controls
 
-The control estimates the STA expected if EMG and steps were unrelated. It is
+The control estimates the STA expected if the signal and steps were unrelated. It is
 drawn as a dashed mean with a shaded ±3 SD band.
 
 | Control | Surrogate events | Band |
@@ -54,11 +54,11 @@ drawn as a dashed mean with a shaded ±3 SD band.
 | Dither Offset | Each real event shifted by a random offset, uniform in [−Offset, +Offset) | SD over nRep repetitions |
 | ISI shuffle | The real inter-event intervals in random order | SD over nRep repetitions |
 | Random time | The same number of events at uniformly random times | SD over nRep repetitions |
-| Global (SEM) | None. Uses the overall EMG mean | ≈ 3 × SD(EMG) / √N |
+| Global (SEM) | None. Uses the overall signal mean | ≈ 3 × SD(x) / √N |
 | No control | None | None |
 
 **Dither Offset** keeps the slow structure of the event train while breaking
-its precise timing to the EMG. This controls for slow co-variation of muscle
+its precise timing to the signal. This controls for slow co-variation of muscle
 activity and locomotion. Choose an offset longer than the step cycle but
 shorter than changes in behaviour. **ISI shuffle** keeps
 the interval distribution. **Random time** keeps only the event count.
@@ -81,7 +81,7 @@ band is ±3.
 ## History
 
 Every **Plot** adds a run to the history list at the bottom of the window. A
-run stores the result, all parameters, the paw, event, trace, EMG type and
+run stores the result, all parameters, the paw, event, trace, ephys type and
 channel. Selecting a run shows it again with its parameters. 🗑️ deletes the
 selected run, ⃠ clears all runs, and [➜ copies the plot into a MATLAB figure.
 

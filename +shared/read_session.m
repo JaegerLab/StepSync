@@ -7,7 +7,7 @@ function saved = read_session(filename)
 %   StepSync:session:older   an older format version
 %   StepSync:zoom            zoom limits not increasing
 
-    VERSION = 3;
+    VERSION = 4;
     saved = load(filename);
     [~, name, ext] = fileparts(filename);
     name = [name ext];
@@ -32,7 +32,7 @@ function saved = read_session(filename)
         error('StepSync:session:format', '%s is incomplete: %s missing.', name, ...
             strjoin(required(~isfield(saved, required)), ', '));
     end
-    unknown = setdiff(fieldnames(saved.figures), {'video', 'emg', 'dlc', 'gait'});
+    unknown = setdiff(fieldnames(saved.figures), {'video', 'ephys', 'pose', 'gait'});
     if ~isempty(unknown)
         error('StepSync:session:format', '%s has unknown modules: %s.', name, strjoin(unknown, ', '));
     end

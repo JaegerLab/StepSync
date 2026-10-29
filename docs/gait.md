@@ -9,11 +9,11 @@ The events are shown in every viewer and are used by the
 
 ## Importing paws
 
-`File > Import DLC` copies paw trajectories from the DLC viewer. If no pose
+`File > Import Pose` copies paw trajectories from the Pose viewer. If no pose
 file is open there, it asks for one. Select one or more paws, typically the
-corrected body parts saved by [DLC Fix](pose.md#correcting-tracking-errors).
+corrected body parts saved by [Pose Fix](pose.md#correcting-tracking-errors).
 
-When the paws come from the DLC viewer and you later edit or correct them
+When the paws come from the Pose viewer and you later edit or correct them
 there, the Gait viewer asks whether to **Update** to the new data or **Keep**
 the copy it has.
 
@@ -21,11 +21,12 @@ the copy it has.
 
 | Control | Default | Description |
 |---|---|---|
-| Frame rate | — | The shared frame rate. Type a rate to override it, or clear it for automatic, e.g. when analysing a DLC file without video or EMG (see [Timing](synchronization.md)) |
+| Frame rate | — | The shared frame rate. Type a rate to override it, or clear it for automatic, e.g. when analysing a pose file without video or ephys data (see [Timing](synchronization.md)) |
 | Resolution | 30 px/cm | Converts pixels to centimetres |
 | Trace | X | `X`, `Y` (cm) or `Speed` (cm/s) |
 | Paw thresh | automatic | Threshold for the selected paw and trace |
-| Min interval | 0.2 s | Expected minimum time between steps |
+| Min interval | 0.2 s | Minimum time between peaks or valleys. Greyed out for rising and falling, which do not use it |
+| Near-zero | automatic | Shown instead of *Min interval* when onset or offset is selected: the speed taken as rest, per paw. Automatic values are shown in italics; type a value to override, or clear the field to return to automatic |
 | Paw list | | The paw to analyse |
 | Steps | on | Show the events of the selected type in all viewers |
 | n = | | Number of events of the selected type |
@@ -54,8 +55,8 @@ All events are frame indices in the original video. Their times come from the
 |---|---|---|
 | rising | X, Y, Speed | Last frame at or below the threshold before the trace rises above it |
 | falling | X, Y, Speed | First frame at or below the threshold after the trace was above it |
-| onset | Speed | Movement onset: the last frame at rest before a rising crossing, searched back over at most *Min interval* |
-| offset | Speed | Movement offset: the first frame at rest after a falling crossing, searched forward over at most *Min interval* |
+| onset | Speed | Movement onset: the last frame at rest before a rising crossing, searched back to the previous falling crossing |
+| offset | Speed | Movement offset: the first frame at rest after a falling crossing, searched forward to the next rising crossing |
 | peak | X, Y, Speed | Local maxima at or above the threshold |
 | valley | X, Y, Speed | Local minima at or below the threshold |
 
@@ -70,18 +71,21 @@ crossings have no minimum spacing.
 
 ### Rest level for onset and offset
 
-The rest level is estimated from the speed trace itself, with no parameter to
-set:
+The rest level is the *Near-zero* field. Set by hand, it applies to the
+selected paw. Left empty, it is estimated from the speed trace itself:
 
 1. The speed is smoothed over 0.15 s and log-compressed.
 2. A histogram of the smoothed speed is searched for two modes, rest and
-   movement, separated by a clear valley.
-3. Sustained stretches below the valley, each at least 0.15 s long, are
+   movement, separated by a clear valley. If movement shows only as a
+   shoulder with no valley, but the lowest mode is the largest, the cut is
+   placed at that mode plus twice its half width (from its left flank).
+3. Sustained stretches below the cut, each at least 0.15 s long, are
    taken as rest.
 4. The rest level is the 75th percentile of the raw speed in those stretches.
 
-If no clear rest period is found, no onsets or offsets are reported, and the
-reason is shown as a tooltip on the event list.
+If no clear rest period is found, the field stays empty, no onsets or offsets
+are reported, and the reason is shown as a tooltip on the field. The estimate
+is conservative; if events are missed, raise the value by hand.
 
 ## Masks
 
@@ -101,7 +105,7 @@ example running speed > 5 cm/s on a treadmill or in an open field.
 
 | Control | Description |
 |---|---|
-| Source | `from DLC` (speed of a chosen body part, e.g. the tail base), `from File` or `from Workspace` |
+| Source | `from Pose` (speed of a chosen body part, e.g. the tail base), `from File` or `from Workspace` |
 | Import Speed | Load the speed from that source |
 | Smooth / Smooth Window | Optional moving average (default 1 s) |
 | Operator / Threshold | Keep frames where speed `>` or `<` the threshold |

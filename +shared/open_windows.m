@@ -2,15 +2,15 @@ function windows = open_windows()
 % windows = shared.open_windows()
 % Open module windows, each followed by its open sub-windows.
 %   windows: struct array with fields
-%     module  'video' | 'emg' | 'dlc' | 'gait'
+%     module  'video' | 'ephys' | 'pose' | 'gait'
 %     fig     the window
 %     isSub   true for a sub-window
 
     data = shared.SessionData.instance();
-    modules = {'video', 'emg', 'dlc', 'gait'};
+    modules = {'video', 'ephys', 'pose', 'gait'};
     % sub-window handles stored in data.<module>.hd
-    subFields = struct('video', {{}}, 'emg', {{'prepGUI'}}, ...
-        'dlc', {{'fixGUI'}}, 'gait', {{'maskFig', 'sta_GUI'}});
+    subFields = struct('video', {{}}, 'ephys', {{'prepGUI'}}, ...
+        'pose', {{'fixGUI'}}, 'gait', {{'maskFig', 'sta_GUI'}});
 
     windows = struct('module', {}, 'fig', {}, 'isSub', {});
     for k = 1:numel(modules)

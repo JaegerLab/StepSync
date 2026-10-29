@@ -2,7 +2,7 @@ function [range, ok] = ask_save_range(fig, what)
 % [range, ok] = shared.ask_save_range(fig, what)
 % Ask whether a module's Save writes the full length or only the current
 % zoom window. Not used by Save session, which always saves everything.
-%   what   shown in the title, e.g. 'EMG'
+%   what   shown in the title, e.g. 'Ephys'
 %   range  [] for the full length, or [t1 t2] (s) for the zoom window
 %   ok     false if cancelled
 

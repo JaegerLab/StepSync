@@ -1,14 +1,14 @@
 function write_session(filename, modules)
 % shared.write_session(filename, modules)
 % Write a session .mat file (-v7.3) with the given modules.
-%   modules: cellstr of modules with an open window, e.g. {'dlc', 'gait'}
+%   modules: cellstr of modules with an open window, e.g. {'pose', 'gait'}
 % Each module is saved with its window position and, if it has data, its
 % data and widget values (see shared.get_param).
 
     data = shared.SessionData.instance();
     out = struct();
     out.fileFormat = 'StepSync session';
-    out.formatVersion = 3;
+    out.formatVersion = 4;
     out.frameRate = data.frameRate;
     out.currentTime = data.currentTime;
     out.currentZoom = data.currentZoom;

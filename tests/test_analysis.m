@@ -5,7 +5,7 @@ end
 
 function testOnsetAndOffsetStayInsideTrace(testCase)
 trace = [0;0;4;4;0];
-s = GAIT.detect_steps(trace, true(size(trace)), 3, 10, 2.5);
+s = gait.detect_steps(trace, true(size(trace)), 3, 10, 2.5);
 verifyEqual(testCase, s.onset, 2);
 verifyEqual(testCase, s.offset, 5);
 end
@@ -13,52 +13,52 @@ end
 function testMaskDoesNotBridgeEvents(testCase)
 trace = [0;0;4;4;0;0;4;4;0];
 mask = true(size(trace)); mask(2:6) = false;
-s = GAIT.detect_steps(trace, mask, 3, 4);
+s = gait.detect_steps(trace, mask, 3, 4);
 verifyEmpty(testCase, s.rising); % frame 6 is masked: no crossing allowed
 end
 
 function testAllFalseMaskHasNoEvents(testCase)
-s = GAIT.detect_steps([0;4;0;4;0], false(5,1), 2, 2);
+s = gait.detect_steps([0;4;0;4;0], false(5,1), 2, 2);
 for name = {'rising','falling','onset','offset','peak','valley'}
     verifyEmpty(testCase, s.(name{1}));
 end
 end
 
 function testIndependentPawThresholds(testCase)
-a = GAIT.detect_steps([0;0;4;4;0], true(5,1), 2, 2);
-b = GAIT.detect_steps([10;10;14;14;10], true(5,1), 12, 2);
+a = gait.detect_steps([0;0;4;4;0], true(5,1), 2, 2);
+b = gait.detect_steps([10;10;14;14;10], true(5,1), 12, 2);
 verifyEqual(testCase, a.rising, b.rising);
 verifyEqual(testCase, a.falling, b.falling);
 end
 
 function testStaTimeOriginAndDuplicates(testCase)
 t = (10:0.01:11)';
-emg = zeros(size(t)); emg(41) = 2; emg(61) = 8;
-r = GAIT.sta(emg, t, [10.4;10.4;10.6], 'method', 'none', 'max_lag', 0.05);
+signal = zeros(size(t)); signal(41) = 2; signal(61) = 8;
+r = gait.sta(signal, t, [10.4;10.4;10.6], 'method', 'none', 'maxLag', 0.05);
 verifyEqual(testCase, r.eventNum, 3);
 verifyEqual(testCase, r.y(abs(r.t)<1e-9), 4, 'AbsTol', 1e-10);
 end
 
 function testStaConstantSignalAtRecordingEdges(testCase)
 t = (0:0.01:1)';
-r = GAIT.sta(7*ones(size(t)), t, [0;1], 'method', 'none', 'max_lag', 0.1);
+r = gait.sta(7*ones(size(t)), t, [0;1], 'method', 'none', 'maxLag', 0.1);
 verifyEqual(testCase, r.y, 7*ones(size(r.y)), 'AbsTol', 1e-10);
 end
 
 function testStaRejectsEmptyEventsAndGaps(testCase)
 t = (0:0.01:1)';
-verifyError(testCase, @()GAIT.sta(ones(size(t)), t, [], 'method','none'), 'GAIT:sta:noEvents');
+verifyError(testCase, @()gait.sta(ones(size(t)), t, [], 'method','none'), 'gait:sta:noEvents');
 t(51:end) = t(51:end)+1;
-verifyError(testCase, @()GAIT.sta(ones(size(t)), t, 0.3, 'method','none'), 'GAIT:sta:timebase');
+verifyError(testCase, @()gait.sta(ones(size(t)), t, 0.3, 'method','none'), 'gait:sta:timebase');
 end
 
 function testRepeatedControlsPreserveConstantSignal(testCase)
 t = (0:0.01:1)';
 for method = {'random_time','isi_shuffle','dither'}
     rng(17);
-    r = GAIT.sta(3*ones(size(t)), t, [0;0.4;0.4;1], ...
-        'method',method{1}, 'nRep',3, 'max_lag',0.1, 'offset',0.05);
-    verifyEqual(testCase, r.random_mean, 3*ones(size(r.t)), 'AbsTol',1e-10);
+    r = gait.sta(3*ones(size(t)), t, [0;0.4;0.4;1], ...
+        'method',method{1}, 'nRep',3, 'maxLag',0.1, 'offset',0.05);
+    verifyEqual(testCase, r.randomMean, 3*ones(size(r.t)), 'AbsTol',1e-10);
 end
 end
 

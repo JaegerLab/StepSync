@@ -1,9 +1,9 @@
 # Pose viewer and correction
 
-The DLC viewer shows body-part trajectories from DeepLabCut or SLEAP and
+The Pose viewer shows body-part trajectories from DeepLabCut or SLEAP and
 corrects tracking errors. The Gait viewer then uses the corrected paws.
 
-<!-- SCREENSHOT: docs/images/dlc-viewer.png. DLC viewer with x/y traces and the correction overlay. -->
+<!-- SCREENSHOT: docs/images/pose-viewer.png. Pose viewer with x/y traces and the correction overlay. -->
 
 ## Supported files
 
@@ -43,7 +43,7 @@ pose file to be checked against its length.
 | X / Y / P | Show the *x* trace, *y* trace and likelihood (right axis, 0–1) |
 | Frame rate | The shared frame rate. Type a rate to override it; clear it for automatic (see [Timing](synchronization.md)) |
 | Frame | Current frame number |
-| DLC Fix | Open the correction window for the selected body part |
+| Pose Fix | Open the correction window for the selected body part |
 | Body-part list | The body part to display, correct and overlay on the video |
 | Delete bodypart | Remove the selected body part from the data (asks first; the last one cannot be deleted) |
 
@@ -54,11 +54,11 @@ magenta circles on the traces.
 ## Correcting tracking errors
 
 Pose estimators sometimes jump briefly to a wrong location, for example a
-paw label landing on the other paw for a few frames. **DLC Fix** finds these
+paw label landing on the other paw for a few frames. **Pose Fix** finds these
 excursions from the trajectory itself and replaces them by interpolation
 through the trustworthy parts.
 
-<!-- SCREENSHOT: docs/images/dlc-fix.png. The DLC auto fix window and the correction overlay with seeds, rejected segments and interpolation. -->
+<!-- SCREENSHOT: docs/images/pose-fix.png. The Pose auto fix window and the correction overlay with seeds, rejected segments and interpolation. -->
 
 ### Settings
 
@@ -146,7 +146,7 @@ settings used, and the original stays unchanged. The new body part can then
 be imported in the Gait viewer. Closing the correction window discards an
 unsaved preview.
 
-To write a file, use `File > Save` in the DLC viewer.
+To write a file, use `File > Save` in the Pose viewer.
 
 ## Saving
 

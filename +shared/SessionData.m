@@ -2,8 +2,8 @@ classdef SessionData < handle
     properties
         fig struct
         video struct
-        dlc struct
-        emg struct
+        pose struct
+        ephys struct
         gait struct
 
         frameRate double = 0;
@@ -18,8 +18,8 @@ classdef SessionData < handle
         TimeChanged         % currentTime moved
         ZoomChanged         % currentZoom moved
         InfoChanged         % time base changed: frame rate, triggers, frame count
-        EMGChanged          % EMG traces changed (open, pre-process, delete)
-        DLCChanged          % DLC table or selection changed; carries shared.DLCChangedData
+        EphysChanged          % ephys traces changed (open, pre-process, delete)
+        PoseChanged          % pose table or selection changed; carries shared.PoseChangedData
         GaitChanged         % gait results changed: steps, selection, visibility
         MaskChanged         % gait mask committed: gait recalculates steps
         MaskPreviewChanged  % gait mask preview: gait redraws trace colours only
@@ -85,10 +85,10 @@ classdef SessionData < handle
             frameRate = obj.frameRate;
             source = 'manual';
             if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
-            % the trigger counts even when all EMG data was deleted
+            % the trigger counts even when all ephys data was deleted
             source = 'trigger';
-            if isfield(obj.emg, 'trigger') && isfield(obj.emg.trigger, 'freq')
-                frameRate = obj.emg.trigger.freq;
+            if isfield(obj.ephys, 'trigger') && isfield(obj.ephys.trigger, 'freq')
+                frameRate = obj.ephys.trigger.freq;
                 if isscalar(frameRate) && isfinite(frameRate) && frameRate > 0, return; end
             end
             if obj.has('video')
@@ -105,9 +105,9 @@ classdef SessionData < handle
         function t = getFrameTimes(obj, nFrames)
             [frameRate, source] = obj.getFrameRate();
             triggers = [];
-            if strcmp(source, 'trigger') && isfield(obj.emg.trigger, 'time') && ...
-                    numel(obj.emg.trigger.time) >= 2
-                triggers = obj.emg.trigger.time;
+            if strcmp(source, 'trigger') && isfield(obj.ephys.trigger, 'time') && ...
+                    numel(obj.ephys.trigger.time) >= 2
+                triggers = obj.ephys.trigger.time;
             end
             t = shared.frame_times(nFrames, frameRate, triggers);
         end
@@ -116,16 +116,16 @@ classdef SessionData < handle
         function counts = frameCounts(obj)
             counts = struct();
             if obj.has('video'), counts.video = obj.video.vid.NumFrames; end
-            if obj.has('dlc'), counts.dlc = height(obj.dlc.table); end
-            if obj.has('gait'), counts.gait = numel(obj.gait.paw(1).raw_x); end
+            if obj.has('pose'), counts.pose = height(obj.pose.table); end
+            if obj.has('gait'), counts.gait = numel(obj.gait.paw(1).rawX); end
         end
 
-        % Notify DLCChanged with what changed.
+        % Notify PoseChanged with what changed.
         %   kind: 'open' | 'edit' | 'commit' | 'preview' | 'selection' | 'close' | 'load'
         %   bodyparts: cellstr of changed body parts (may be empty)
-        function notifyDLC(obj, kind, bodyparts)
+        function notifyPose(obj, kind, bodyparts)
             if nargin < 3, bodyparts = {}; end
-            notify(obj, 'DLCChanged', shared.DLCChangedData(kind, bodyparts));
+            notify(obj, 'PoseChanged', shared.PoseChangedData(kind, bodyparts));
         end
 
         % Remember the folder of a file or folder opened or saved in a module.
@@ -155,11 +155,11 @@ classdef SessionData < handle
                     if ~isempty(obj.video) && isfield(obj.video, 'vid') && ~isempty(obj.video.vid)
                         tf = true;
                     end
-                case 'emg'
+                case 'ephys'
                     % raw or any processed data; metadata alone does not count
-                    tf = ~isempty(obj.emg) && ~isempty(EMG.emg_types(obj.emg));
-                case 'dlc'
-                    if ~isempty(obj.dlc) && isfield(obj.dlc, 'table') && ~isempty(obj.dlc.table)
+                    tf = ~isempty(obj.ephys) && ~isempty(ephys.ephys_types(obj.ephys)); %#ok<PROPLC> package
+                case 'pose'
+                    if ~isempty(obj.pose) && isfield(obj.pose, 'table') && ~isempty(obj.pose.table)
                         tf = true;
                     end
                 case 'gait'

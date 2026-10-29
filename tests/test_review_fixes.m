@@ -18,10 +18,10 @@ function testGlobalUsesEventCountNotRepetitions(testCase)
 t = (0:0.01:3)';
 x = sin(2*pi*3*t)+0.4*cos(2*pi*7*t);
 events = (0.5:0.1:2.5)';
-a = GAIT.sta(x,t,events,'method','global','max_lag',0.1,'nRep',1);
-b = GAIT.sta(x,t,events,'method','global','max_lag',0.1,'nRep',1000);
-verifyEqual(testCase,a.random_std,b.random_std,'AbsTol',1e-12);
-verifyEqual(testCase,a.random_std,std(x)./sqrt(a.sampleCount),'AbsTol',1e-12);
+a = gait.sta(x,t,events,'method','global','maxLag',0.1,'nRep',1);
+b = gait.sta(x,t,events,'method','global','maxLag',0.1,'nRep',1000);
+verifyEqual(testCase,a.randomStd,b.randomStd,'AbsTol',1e-12);
+verifyEqual(testCase,a.randomStd,std(x)./sqrt(a.sampleCount),'AbsTol',1e-12);
 verifyEqual(testCase,a.sampleCount,numel(events)*ones(size(a.t)));
 end
 
@@ -31,7 +31,7 @@ t = (1:500)'/fs;
 rest = 0.2+0.02*sin(2*pi*7*t);
 movement = 12+sin(2*pi*3*t);
 speed = [rest;movement;rest;movement;rest];
-[threshold,info] = GAIT.auto_rest_threshold(speed,fs);
+[threshold,info] = gait.auto_rest_threshold(speed,fs);
 verifyTrue(testCase,isfinite(threshold));
 verifyGreaterThan(testCase,threshold,0.19);
 verifyLessThan(testCase,threshold,0.23);
@@ -40,9 +40,9 @@ verifyLessThan(testCase,max(speed(info.restMask)),1);
 end
 
 function testNoRestEstimateDoesNotInventOnsets(testCase)
-[threshold,~] = GAIT.auto_rest_threshold(5*ones(500,1),100);
+[threshold,~] = gait.auto_rest_threshold(5*ones(500,1),100);
 verifyTrue(testCase,isnan(threshold));
-s = GAIT.detect_steps([0;0;4;4;0],true(5,1),3,10,threshold);
+s = gait.detect_steps([0;0;4;4;0],true(5,1),3,10,threshold);
 verifyEqual(testCase,s.rising,2);
 verifyEmpty(testCase,s.onset);
 verifyEmpty(testCase,s.offset);
@@ -50,9 +50,9 @@ end
 
 function testBinaryScalingUsesIndividualUnits(testCase)
 channels = struct('bit_volts',{0.195,0.001},'units',{'uV','V'});
-actual = EMG.scale_binary_channels([10 10;-10 -10],channels,'uV');
+actual = ephys.scale_binary_channels([10 10;-10 -10],channels,'uV');
 verifyEqual(testCase,actual,[1.95 10000;-1.95 -10000],'AbsTol',1e-10);
-verifyEqual(testCase,EMG.scale_binary_channels(10,channels(2),'V'),0.01,'AbsTol',1e-12);
+verifyEqual(testCase,ephys.scale_binary_channels(10,channels(2),'V'),0.01,'AbsTol',1e-12);
 end
 
 function testCsvRoundTripIgnoresPreviewAndFillsMissingLikelihood(testCase)
@@ -63,8 +63,8 @@ t = table([1;2],[3;4],[0.8;0.9],[5;6],[7;8],[99;99],[88;88], ...
 t.Properties.UserData = {'paw','tail','temp'};
 t.Properties.Description = 'C:\source\pose.csv';
 t = addprop(t,'Scorer','table'); t.Properties.CustomProperties.Scorer = 'test_model';
-DLC.save_csv(filename,t);
-loaded = DLC.read_csv(filename);
+pose.save_csv(filename,t);
+loaded = pose.read_csv(filename);
 verifyEqual(testCase,height(loaded),2);
 verifyEqual(testCase,width(loaded),6);
 verifyEqual(testCase,loaded.paw_x,t.paw_x);
@@ -75,16 +75,16 @@ verifyFalse(testCase,any(startsWith(loaded.Properties.VariableNames,'temp_')));
 end
 
 function testLikelihoodConversionIsGradedAndRepeatable(testCase)
-seg = struct('flag',[2;2;1;-1;-2;-3;0], 'len',[10;1;1;1;1;1;1], 'win_width',5);
-p = DLC.seg_likelihood(seg);
+seg = struct('flag',[2;2;1;-1;-2;-3;0], 'len',[10;1;1;1;1;1;1], 'winWidth',5);
+p = pose.seg_likelihood(seg);
 verifyEqual(testCase,p,[0.95*ones(10,1);1;0.9;0.1;0.5;0;0.5],'AbsTol',1e-12);
-verifyEqual(testCase,p,DLC.seg_likelihood(seg));
+verifyEqual(testCase,p,pose.seg_likelihood(seg));
 end
 
-function testDlcChangedDataNormalisesBodyparts(testCase)
-evt = shared.DLCChangedData('edit',"paw");
+function testPoseChangedDataNormalisesBodyparts(testCase)
+evt = shared.PoseChangedData('edit',"paw");
 verifyEqual(testCase,evt.Kind,'edit');
 verifyEqual(testCase,evt.Bodyparts,{'paw'});
-evt = shared.DLCChangedData('selection');
+evt = shared.PoseChangedData('selection');
 verifyTrue(testCase,iscell(evt.Bodyparts) && isempty(evt.Bodyparts));
 end

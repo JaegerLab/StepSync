@@ -34,12 +34,12 @@ at the last frame that has a time.
 
 | Marker | Meaning |
 |---|---|
-| Cyan **+** | The body part selected in the DLC viewer |
-| Green **o** | The corrected position previewed by DLC Fix |
+| Cyan **+** | The body part selected in the Pose viewer |
+| Green **o** | The corrected position previewed by Pose Fix |
 | Magenta rings | Steps of the selected paw and event type from the Gait viewer. Rings fade with their distance in time from the current frame |
 
 You can drag the cyan or green marker with the mouse to correct the position
-on the current frame. The pose data in the DLC viewer updates immediately.
+on the current frame. The pose data in the Pose viewer updates immediately.
 
 ## Exporting a marked video
 

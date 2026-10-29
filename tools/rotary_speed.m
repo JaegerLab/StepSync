@@ -24,9 +24,9 @@ function [speed, t] = rotary_speed(WheelData, fs)
     end
 
     % remove all the non moving data points (duplicates)
-    non_move = find(diff(time)==0 & diff(pos)==0)+1;
-    pos(non_move)=[];
-    time(non_move)=[];
+    nonMove = find(diff(time)==0 & diff(pos)==0)+1;
+    pos(nonMove)=[];
+    time(nonMove)=[];
 
     if any(diff(time) <= 0) 
         error('WheelData.Times must be strictly increasing.');

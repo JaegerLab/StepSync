@@ -1,12 +1,12 @@
-function hfig = StepSync(default_path)
-% StepSync(default_path)
+function hfig = StepSync(defaultPath)
+% StepSync(defaultPath)
 % Launcher with one button per module. It closes when a module window
 % opens. If module windows are open already, they are brought to front
-% instead. default_path: start folder of the file dialogs.
+% instead. defaultPath: start folder of the file dialogs.
 
     data = shared.SessionData.instance();
     if nargin >= 1
-        data.defaultPath = default_path;
+        data.defaultPath = defaultPath;
     elseif isempty(data.defaultPath)
         data.defaultPath = 'E:\Openfield\data';
     end
@@ -30,8 +30,8 @@ function hfig = StepSync(default_path)
     % Data Launcher Buttons
     grid1 = uigridlayout(fig, [2 2], 'Padding', [20 20 20 20]);
     uibutton(grid1, 'Text', 'Video', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
-    uibutton(grid1, 'Text', 'EMG', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
-    uibutton(grid1, 'Text', 'DLC', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
+    uibutton(grid1, 'Text', 'Ephys', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
+    uibutton(grid1, 'Text', 'Pose', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
     uibutton(grid1, 'Text', 'Gait', 'ButtonPushedFcn', @(src,~)shared.open_module(src.Text));
 end
 

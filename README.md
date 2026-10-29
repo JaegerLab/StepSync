@@ -1,6 +1,6 @@
 # StepSync
 
-StepSync is a MATLAB application for aligning electromyography (EMG), video
+StepSync is a MATLAB application for aligning electrophysiology (such as EMG or LFP), video
 and markerless pose tracking recorded during locomotion. It detects steps from
 paw trajectories and computes step-triggered averages (STA) of muscle activity.
 
@@ -8,10 +8,10 @@ paw trajectories and computes step-triggered averages (STA) of muscle activity.
 
 ## Features
 
-- **One shared timeline.** Video, EMG, pose and gait windows follow the same
-  cursor and zoom. Video frames are placed on the EMG clock using the camera
-  TTL pulses recorded with the EMG.
-- **EMG.** Reads Intan (`.rhd`/`.rhs`) and Open Ephys recordings. Preprocessing
+- **One shared timeline.** Video, ephys, pose and gait windows follow the same
+  cursor and zoom. Video frames are placed on the ephys clock using the camera
+  TTL pulses recorded with the ephys data.
+- **Ephys.** Reads Intan (`.rhd`/`.rhs`) and Open Ephys recordings. Preprocessing
   (high-pass filter, rectification, smoothing, down-sampling) can be chained,
   and channels can be labelled with a channel map.
 - **Pose.** Reads DeepLabCut CSV, HDF5 and MAT files, and SLEAP exports in
@@ -21,10 +21,10 @@ paw trajectories and computes step-triggered averages (STA) of muscle activity.
 - **Gait.** Detects steps from paw x, y or speed (threshold crossings,
   movement onset and offset, peaks, valleys). Time-based and speed-based masks
   exclude unwanted periods.
-- **Step-triggered average.** Averages EMG around step events against a chosen
+- **Step-triggered average.** Averages an ephys signal (for example rectified EMG) around step events against a chosen
   null distribution (dithered, shuffled or random events), with a ±3 SD band.
 - **Sessions and exports.** Saves and restores whole sessions. Writes corrected
-  pose files, EMG and gait `.mat` files, and videos with markers drawn in.
+  pose files, ephys and gait `.mat` files, and videos with markers drawn in.
 
 ## Requirements
 
@@ -44,14 +44,14 @@ addpath(pwd)
 StepSync('D:\my_data')   % the folder where file dialogs open first
 ```
 
-The launcher opens with four buttons: **Video**, **EMG**, **DLC** and
+The launcher opens with four buttons: **Video**, **Ephys**, **Pose** and
 **Gait**. A typical analysis:
 
-1. **EMG:** `File > Open` a recording folder, and pick the camera TTL channel
+1. **Ephys:** `File > Open` a recording folder, and pick the camera TTL channel
    in the trigger menu.
 2. **Video** (optional): `File > Open` the behaviour video.
-3. **DLC:** `File > Open` the pose file, and correct tracking errors with **DLC Fix**.
-4. **Gait:** `File > Import DLC`, choose the paws, set the threshold and mask,
+3. **Pose:** `File > Open` the pose file, and correct tracking errors with **Pose Fix**.
+4. **Gait:** `File > Import Pose`, choose the paws, set the threshold and mask,
    then open **Step Triggered Avg**.
 5. `File > Save session` to keep everything.
 
@@ -63,9 +63,9 @@ detail.
 | Guide | Contents |
 |---|---|
 | [Getting started](docs/getting-started.md) | Installation, the launcher, menus, a first analysis |
-| [Timing and synchronization](docs/synchronization.md) | How video frames are placed on the EMG clock |
+| [Timing and synchronization](docs/synchronization.md) | How video frames are placed on the ephys clock |
 | [Video viewer](docs/video.md) | Playback, pose markers, exporting marked videos |
-| [EMG viewer](docs/emg.md) | Reading recordings, camera TTL, channel maps, preprocessing |
+| [Ephys viewer](docs/ephys.md) | Reading recordings, camera TTL, channel maps, preprocessing |
 | [Pose viewer and correction](docs/pose.md) | Pose formats, frame alignment, the correction algorithm |
 | [Gait analysis](docs/gait.md) | Step detection, event definitions, masks |
 | [Step-triggered average](docs/sta.md) | STA computation and null controls |
@@ -89,5 +89,5 @@ Bundled third-party code keeps its own terms:
 
 - `+shared/fastsmooth.m` © 2012 Thomas C. O'Haver, MIT-style license (in the
   file header), modified to smooth matrices column-wise.
-- `+EMG/read_Intan_RHD2000.m` and `+EMG/read_Intan_RHS2000.m` are adapted from
+- `+ephys/read_Intan_RHD2000.m` and `+ephys/read_Intan_RHS2000.m` are adapted from
   the file readers published by Intan Technologies.

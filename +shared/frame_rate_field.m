@@ -1,7 +1,7 @@
 function field = frame_rate_field(parent)
 %FRAME_RATE_FIELD Edit field for the shared frame rate.
 % Typing a rate overrides the automatic one. Clearing the field or typing 0
-% returns to automatic: the field then shows the rate from the EMG trigger,
+% returns to automatic: the field then shows the rate from the ephys trigger,
 % the video, or 1 (frame units), in italics. It follows InfoChanged itself.
 data = shared.SessionData.instance();
 field = uieditfield(parent, 'numeric', 'Limits', [0 Inf], 'AllowEmpty', 'on', ...
@@ -22,8 +22,8 @@ switch source
         field.Tooltip = 'Typed-in rate, also used instead of the trigger times. Clear it or enter 0 for automatic.';
         return;
     case 'trigger'
-        from = 'EMG camera trigger';
-        if isfield(data.emg.trigger, 'channel'), from = [from ' (' data.emg.trigger.channel ')']; end
+        from = 'ephys camera trigger';
+        if isfield(data.ephys.trigger, 'channel'), from = [from ' (' data.ephys.trigger.channel ')']; end
     case 'video'
         from = 'video file';
     otherwise

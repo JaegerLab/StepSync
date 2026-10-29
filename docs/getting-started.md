@@ -13,7 +13,7 @@
    [open-ephys-matlab-tools](https://github.com/open-ephys/open-ephys-matlab-tools)
    and add it to the MATLAB path. Intan recordings need nothing extra.
 
-StepSync is organised as MATLAB packages (`+EMG`, `+DLC`, `+GAIT`, `+VIDEO`,
+StepSync is organised as MATLAB packages (`+ephys`, `+pose`, `+gait`, `+video`,
 `+shared`). Add only the repository root to the path, not the package folders:
 
 ```matlab
@@ -33,13 +33,13 @@ folder, so it is best to pass your own.
 
 <!-- SCREENSHOT: docs/images/launcher.png. The launcher window with its four buttons. -->
 
-The launcher has one button per module: **Video**, **EMG**, **DLC** (pose)
+The launcher has one button per module: **Video**, **Ephys**, **Pose**
 and **Gait**. Opening a module closes the launcher. If StepSync windows are
 already open, running `StepSync` again brings them to the front.
 
 ## Windows and menus
 
-Each module opens in its own window. The Video, EMG, DLC and Gait windows
+Each module opens in its own window. The Video, Ephys, Pose and Gait windows
 share one cursor time and one zoom window. Clicking a trace in any viewer
 moves the cursor in all of them, and zooming in one zooms the others.
 
@@ -49,9 +49,9 @@ Every module window has the same menu bar.
 
 | Item | Shortcut | Action |
 |---|---|---|
-| Open | Ctrl+O | Open a file for this module (EMG: **Open File**) |
+| Open | Ctrl+O | Open a file for this module (Ephys: **Open File**) |
 | Save | Ctrl+S | Save this module's data (see [Sessions and files](files.md)) |
-| *(module-specific items)* | | EMG: **Open folder**. Gait: **Import DLC** |
+| *(module-specific items)* | | Ephys: **Open folder**. Gait: **Import Pose** |
 | Load session | | Replace everything with a saved session |
 | Save session | | Save the open modules to one session file |
 | Export to Workspace | | Put the session data in the MATLAB base workspace |
@@ -63,21 +63,21 @@ Every module window has the same menu bar.
 | Item | Shortcut |
 |---|---|
 | Video | Ctrl+I |
-| EMG | Ctrl+E |
-| DLC | Ctrl+D |
+| Ephys | Ctrl+E |
+| Pose | Ctrl+P |
 | Gait | Ctrl+G |
 | Open All | Ctrl+A |
 | Bring All to Top | Ctrl+T |
 
-A check mark shows which modules are open. Open tool windows (EMG
-Pre-Process, DLC auto fix, Edit Mask, Step-Triggered Average) are listed
+A check mark shows which modules are open. Open tool windows (Ephys
+Pre-Process, Pose auto fix, Edit Mask, Step-Triggered Average) are listed
 indented under their module, and choosing one brings it to the front. On
 macOS the shortcuts use Cmd instead of Ctrl.
 
 When the last module window closes, the session ends and its data is cleared.
 Save the session first if you need it.
 
-The EMG, DLC and Gait viewers all have these buttons below their plot:
+The Ephys, Pose and Gait viewers all have these buttons below their plot:
 
 | Button | Action |
 |---|---|
@@ -87,27 +87,27 @@ The EMG, DLC and Gait viewers all have these buttons below their plot:
 
 ## A first analysis
 
-The order below is the usual one. Opening the EMG first means video and pose
+The order below is the usual one. Opening the ephys recording first means video and pose
 frames are timed by the camera TTL pulses from the start.
 
-1. **EMG.** In the EMG viewer, choose `File > Open` and select the folder
+1. **Ephys.** In the Ephys viewer, choose `File > Open` and select the folder
    that holds the recording. In the trigger menu, choose the digital channel
    that carries the camera trigger. The info line then shows the number of
-   TTL pulses and their frequency. See [EMG viewer](emg.md).
-2. **Preprocess EMG** (optional). Click **Pre-Process**, check the settings,
+   TTL pulses and their frequency. See [Ephys viewer](ephys.md).
+2. **Preprocess** (optional). Click **Pre-Process**, check the settings,
    **Preview** one channel, then **Apply & Close**. The result appears as
    *Processed 1* in the data-type list.
 3. **Video** (optional). In the Video viewer, choose `File > Open`. The video
-   is shown on the EMG time base. See [Video viewer](video.md).
-4. **Pose.** In the DLC viewer, choose `File > Open` and pick the pose file.
-   Use **DLC Fix** to correct tracking errors and **Save As** the corrected
+   is shown on the ephys time base. See [Video viewer](video.md).
+4. **Pose.** In the Pose viewer, choose `File > Open` and pick the pose file.
+   Use **Pose Fix** to correct tracking errors and **Save As** the corrected
    body part. See [Pose viewer and correction](pose.md).
-5. **Gait.** In the Gait viewer, choose `File > Import DLC` and select the
+5. **Gait.** In the Gait viewer, choose `File > Import Pose` and select the
    paws. Set **Resolution** (pixels per cm), the trace (X, Y or Speed) and a
    threshold. Use **Edit Mask** to exclude periods you don't want to analyse.
    Step events appear as magenta circles in every viewer. See
    [Gait analysis](gait.md).
-6. **STA.** Pick the EMG channel and data type in the EMG viewer, and the paw
+6. **STA.** Pick the ephys channel and data type in the Ephys viewer, and the paw
    and event type in the Gait viewer. Then click **Step Triggered Avg** and
    **Plot**. See [Step-triggered average](sta.md).
 7. **Save.** `File > Save session` stores the data, settings and window

@@ -23,10 +23,10 @@ the saved modules exactly as they were.
 | Variable | Contents |
 |---|---|
 | `fileFormat` | `'StepSync session'` |
-| `formatVersion` | `3` |
+| `formatVersion` | `4` |
 | `frameRate`, `currentTime`, `currentZoom` | Shared timing state |
 | `figures` | Window position of each saved module |
-| `video`, `emg`, `dlc`, `gait` | Module data, with control settings in `.parameters` |
+| `video`, `ephys`, `pose`, `gait` | Module data, with control settings in `.parameters` |
 
 ## Module files
 
@@ -34,24 +34,24 @@ Each module's `File > Save` asks whether to save the **full length** or only
 the current **zoom window**. The default file name ends in `_StepSync` (or
 `_gait`), and the file a module was opened from is never overwritten.
 
-### EMG files
+### Ephys files
 
-`File > Save` in the EMG viewer asks which data types to save, then writes:
+`File > Save` in the Ephys viewer asks which data types to save, then writes:
 
 | Variable | Contents |
 |---|---|
-| `fileFormat`, `formatVersion` | `'StepSync EMG'`, `1` |
-| `emg` | Channel names and units, camera trigger, channel map, source, `time_range` (empty for full length) |
-| `raw` | `data` (samples × channels), `t` (s), `sample_rate` (Hz) |
+| `fileFormat`, `formatVersion` | `'StepSync Ephys'`, `1` |
+| `ephys` | Channel names and units, camera trigger, channel map, source, `timeRange` (empty for full length) |
+| `raw` | `data` (samples × channels), `t` (s), `sampleRate` (Hz) |
 | `processed1`, `processed2`, … | As `raw`, plus `parameters`: `FilterType`, `HighPassFreq`, `LowPassFreq`, `FiltFilt`, `Rectify`, `DownSampleRate`, `Source` |
 
 Times are on the original recording clock, also in a zoom-window save.
-EMG `File > Open File` with a `.mat` file lists the stored types with their sizes, so you can load
+Ephys `File > Open File` with a `.mat` file lists the stored types with their sizes, so you can load
 only what you need.
 
 ### Pose files
 
-`File > Save` in the DLC viewer writes a DeepLabCut-format CSV:
+`File > Save` in the Pose viewer writes a DeepLabCut-format CSV:
 
 - three header rows: `scorer`, `bodyparts`, `coords` (`x`, `y`,
   `likelihood`);
@@ -67,14 +67,14 @@ likelihood codes described in [Pose viewer and correction](pose.md#how-it-works)
 
 | Variable | Contents |
 |---|---|
-| `fileFormat`, `formatVersion` | `'StepSync gait'`, `1` |
-| `gait.paw` | `name`, `raw_x`, `raw_y` (pixels) and thresholds of each paw |
+| `fileFormat`, `formatVersion` | `'StepSync gait'`, `2` |
+| `gait.paw` | `name`, `rawX`, `rawY` (pixels) and thresholds of each paw |
 | `gait.mask`, `gait.maskParam` | The mask and the mask editor's settings |
 | `gait.selection` | Selected paw, trace and event type |
 | `gait.resolution`, `gait.minInterval`, `gait.frameRate` | Settings |
 | `gait.sta` | STA history |
 | `gait.filename`, `gait.source` | The pose file the paws came from |
-| `gait.time_range` | Empty for full length |
+| `gait.timeRange` | Empty for full length |
 
 Step events, speeds and centimetre traces are not stored. They are
 recalculated when the file is opened. In a zoom-window save, frames outside
@@ -96,14 +96,14 @@ StepSync. Main fields:
 |---|---|
 | `data.frameRate`, `data.currentTime`, `data.currentZoom` | Shared state |
 | `data.getFrameTimes(n)` | Times (s) of video frames 1…n |
-| `data.emg.raw`, `data.emg.processed(k)` | `data`, `t`, `sample_rate` (and `parameters`) |
-| `data.emg.digital` | Digital channels: `name`, `rise`, `fall` edge times |
-| `data.emg.trigger` | Chosen camera TTL: `channel`, `time`, `freq`, `number` |
-| `data.dlc.table` | Pose table: `<part>_x`, `<part>_y`, `<part>_likelihood` |
-| `data.dlc.t` | Time of each pose frame |
+| `data.ephys.raw`, `data.ephys.processed(k)` | `data`, `t`, `sampleRate` (and `parameters`) |
+| `data.ephys.digital` | Digital channels: `name`, `rise`, `fall` edge times |
+| `data.ephys.trigger` | Chosen camera TTL: `channel`, `time`, `freq`, `number` |
+| `data.pose.table` | Pose table: `<part>_x`, `<part>_y`, `<part>_likelihood` |
+| `data.pose.t` | Time of each pose frame |
 | `data.gait.t` | Time of each gait frame |
 | `data.gait.mask` | Logical mask (true = analysed) |
 | `data.gait.paw(i)` | `name`, `x`, `y` (cm), `speed` (cm/s), and events `rising`, `falling`, `onset`, `offset`, `peak`, `valley`, `masked` (frame indices) |
-| `data.gait.sta(j)` | STA runs: `t`, `y`, `random_mean`, `random_std`, `sampleCount`, parameters and selections |
+| `data.gait.sta(j)` | STA runs: `t`, `y`, `randomMean`, `randomStd`, `sampleCount`, parameters and selections |
 
 Events are only up to date for the paw and trace selected in the Gait viewer.

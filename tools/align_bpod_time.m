@@ -25,8 +25,8 @@ function [tOut, info] = align_bpod_time(tBpod, ttlBpod, ttlEphys, varargin)
 %
 % Outputs
 %   tOut : tBpod on the ephys clock (s)
-%   info : slope, offset, drift_ppm, residual_rms, residual_max (s),
-%          n_pulses, residuals
+%   info : slope, offset, driftPpm, residualRms, residualMax (s),
+%          nPulses, residuals
 %
 % Example (wheel session, Bpod + Open Ephys)
 %   load(bpodFile, 'SessionData');
@@ -75,21 +75,21 @@ function [tOut, info] = align_bpod_time(tBpod, ttlBpod, ttlEphys, varargin)
 
     info.slope        = coef(1);
     info.offset       = coef(2);
-    info.drift_ppm    = (coef(1) - 1) * 1e6;
-    info.residual_rms = sqrt(mean(residuals.^2));
-    info.residual_max = max(abs(residuals));
-    info.n_pulses     = n;
+    info.driftPpm    = (coef(1) - 1) * 1e6;
+    info.residualRms = sqrt(mean(residuals.^2));
+    info.residualMax = max(abs(residuals));
+    info.nPulses     = n;
     info.residuals    = residuals;
 
     fprintf(['Bpod -> ephys: offset %.3f ms, drift %.1f ppm, ' ...
         'residual rms %.3f ms, max %.3f ms (%d pulses)\n'], ...
-        info.offset * 1e3, info.drift_ppm, info.residual_rms * 1e3, ...
-        info.residual_max * 1e3, n);
+        info.offset * 1e3, info.driftPpm, info.residualRms * 1e3, ...
+        info.residualMax * 1e3, n);
 
-    if info.residual_max > opt.MaxResidual
+    if info.residualMax > opt.MaxResidual
         warning(['Largest residual %.3f ms exceeds %.3f ms. Pulses may be ' ...
             'missing on one clock, or the wrong TTL line was used.'], ...
-            info.residual_max * 1e3, opt.MaxResidual * 1e3);
+            info.residualMax * 1e3, opt.MaxResidual * 1e3);
     end
 
     %% Map times

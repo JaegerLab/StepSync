@@ -11,7 +11,7 @@ function save_session(fig)
         return;
     end
     modules = {windows.module};
-    names = struct('video', 'Video', 'emg', 'EMG', 'dlc', 'DLC', 'gait', 'Gait');
+    names = struct('video', 'Video', 'ephys', 'Ephys', 'pose', 'Pose', 'gait', 'Gait');
     labels = cellfun(@(m)names.(m), modules, 'UniformOutput', false);
     [selected, ok] = listdlg('Name', 'Save session', 'PromptString', 'Modules to save:', ...
         'ListString', labels, 'SelectionMode', 'multiple', ...

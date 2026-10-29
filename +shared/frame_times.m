@@ -1,5 +1,5 @@
 function t = frame_times(nFrames, frameRate, triggerTimes)
-%FRAME_TIMES Frame times on the EMG clock; a one-record tail mismatch is allowed.
+%FRAME_TIMES Frame times on the ephys clock; a one-record tail mismatch is allowed.
 validateattributes(nFrames, {'numeric'}, {'scalar','integer','nonnegative'});
 validateattributes(frameRate, {'numeric'}, {'scalar','finite','positive'});
 if nargin < 3 || isempty(triggerTimes)

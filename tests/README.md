@@ -22,10 +22,10 @@ random controls and smoothing limits. `test_windows`
 covers sub-window placement on multiple monitors, the session reset after the
 last module window closes, and the remembered dialog folder. `test_sessions`
 writes session files and reads them back (selected modules only, format
-marker `fileFormat = 'StepSync session'`, `formatVersion = 3`) and checks that
-other files, older and newer formats are rejected. `test_emg` covers the EMG
-data types (Raw, Processed 1..N, renumbering after delete, `has('emg')` with
-processed data only, frame timing from the trigger without data), the EMG
+marker `fileFormat = 'StepSync session'`, `formatVersion = 4`) and checks that
+other files, older and newer formats are rejected. `test_ephys` covers the ephys
+data types (Raw, Processed 1..N, renumbering after delete, `has('ephys')` with
+processed data only, frame timing from the trigger without data), the ephys
 `.mat` file (selected types, processed-only loading, rejected files),
 down sampling onto an exact grid from time 0 and the four filter types, the
 TTL channel labels (count, width, rate) and the frame-rate sources (a typed-in
@@ -50,7 +50,7 @@ preview versus commit, threshold persistence, all-false masks and invalidation
 after a failed calculation, and the menu bar: launcher closing, Window menu
 checkmarks and sub-windows, and Exit all resetting the session; and that
 restoring a session replaces all module windows and brings back window
-positions, widget values, data, frame rate, time and zoom; and that EMG
+positions, widget values, data, frame rate, time and zoom; and that ephys
 pre-processing adds Processed types from the selected source (with the
 requested rate and `parameters.Source`), the delete button is off while the
 pre-process window is open, and deleting every type keeps the trigger. The viewers
@@ -73,7 +73,7 @@ Manual checks of the menu bar and windows:
 - Titles show the opened file, also after Load session; file dialogs start in
   the folder of the last file opened.
 - Shortcuts in every window with a menu: Ctrl+O Open, Ctrl+S Save, Ctrl+W
-  Close, Ctrl+I/E/D/G open or raise Video/EMG/DLC/Gait, Ctrl+A Open All,
+  Close, Ctrl+I/E/P/G open or raise Video/Ephys/Pose/Gait, Ctrl+A Open All,
   Ctrl+T Bring All to Top.
 
 Manual checks with representative recordings are still required:
@@ -82,7 +82,7 @@ Manual checks with representative recordings are still required:
 - Switch to a recording without camera TTL; verify old triggers/processed data are gone.
 - Load Intan and Open Ephys recordings; check the trigger menu labels (count, width, rate)
   and that choosing the camera line synchronizes the frames.
-- Load DLC CSV/HDF5/MAT files (also SLEAP's DeepLabCut-format csv export); inspect markers at known frames.
+- Load pose CSV/HDF5/MAT files (DeepLabCut format, also SLEAP's DeepLabCut-format csv export); inspect markers at known frames.
 - Use a video whose encoded rate differs from acquisition rate; check first, consecutive,
   jumped-to and last frames, and playback speed.
 - Save a session with a rate override, selected paw/trace, thresholds, time and zoom;
@@ -92,7 +92,7 @@ Manual checks with representative recordings are still required:
 - Load session asks once when module windows are open, not from the launcher;
   a non-session or old session file shows an alert and closes nothing.
 
-Manual checks of EMG:
+Manual checks of Ephys:
 
 - Pre-process Raw, then pre-process Processed 1: the preview (yellow)
   overlays the selected source; the dropdown lists Raw, Processed 1, 2.
@@ -100,8 +100,8 @@ Manual checks of EMG:
   processed types are renumbered; with everything deleted the dropdown shows
   "no data", plots disappear, and the video still uses the trigger timing.
 - Save with several types offers a selection; the title switches to the saved
-  file. Choosing the `.mat` the EMG was opened from is refused.
-- EMG Open File with one or several .rhd/.rhs files joins them; Open folder
+  file. Choosing the `.mat` the ephys data was opened from is refused.
+- Ephys Open File with one or several .rhd/.rhs files joins them; Open folder
   still reads Intan and Open Ephys folders; mixing .mat with other files is
   refused.
 - Open File with a .mat lists raw/processed with sizes; open only a processed type and
@@ -109,9 +109,9 @@ Manual checks of EMG:
 - Without open-ephys-matlab-tools on the path, opening an Open Ephys folder
   prints a message, shows a message box with the install link, and stops.
 
-Manual checks of DLC and Gait files:
+Manual checks of Pose and Gait files:
 
-- DLC Save, full length and zoom window: the title switches to the saved
+- Pose Save, full length and zoom window: the title switches to the saved
   file; choosing the file it was opened from is refused; a fix preview that
   was not committed is not in the file.
 - Open the zoom-window csv with the full video open: an info alert says it
@@ -121,13 +121,13 @@ Manual checks of DLC and Gait files:
   resolution, min interval, mask and STA history come back; steps match.
   A zoom-window save shows only that part, the rest masked.
 - Gait Open with a different frame rate warns. A gait file imported from the
-  DLC viewer follows DLC edits after Open only if the DLC viewer has the
+  Pose viewer follows pose edits after Open only if the Pose viewer has the
   same file open.
 
 Manual checks of the video export (File > Save in the video window):
 
 - Full length and zoom window; quality prompt defaults to 80. Markers in the
-  file match the window: cyan + at the DLC point (no fix preview), magenta
+  file match the window: cyan + at the pose point (no fix preview), magenta
   step circles fading with time, same size as on screen.
 - During the export Play reads Abort (n%), the slider shows progress, the
   image updates, marker dragging and other controls are off, and other

@@ -473,7 +473,7 @@ ylim(ax, yl);
 [~, idx] = ismember([{'x', 'y'}, S.legendOrder], named);
 idx = idx(idx > 0);
 legend(ax, h(idx), 'Location', S.legendLocation, 'AutoUpdate', 'off');
-xlabel(ax, 'Frame'); ylabel(ax, 'Location (pixel)');
+xlabel(ax, 'Frame'); ylabel(ax, 'Coordinate (pixel)');
 title(ax, sprintf('%d segments, %d good (%d seeds), %d conflicts', numel(seg.flag), ...
     sum(seg.flag > 0), sum(seg.flag == 2), sum(seg.conflict)));
 

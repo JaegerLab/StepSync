@@ -67,14 +67,14 @@ S.legend.y = 'Y';
 S.legend.p = 'P';
 S.legend.interp = 'Interpolation';
 S.legend.jump = 'Jump';
-S.legend.good = 'Presumed good';
-S.legend.bad = 'Presumed bad';
+S.legend.good = 'Accepted';
+S.legend.bad = 'Rejected';
 S.legend.quest = 'Questionable';
 S.legend.unflag = 'Undetermined';
 S.legend.userGood = 'User confirmed';
 S.legend.userBad = 'User rejected';
-S.legend.attnConflict = 'Attn: adjacent good';
-S.legend.attnLongBad = 'Attn: long bad';
+S.legend.attnConflict = 'Attn: Conflict';
+S.legend.attnLongBad = 'Attn: Long bad';
 S.legend.attnInterp = 'Attn: long interp';
 
 % clicks

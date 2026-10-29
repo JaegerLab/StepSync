@@ -92,11 +92,18 @@ function fig = ephys_viewer()
 
     %% === Open Intan file(s) or a .mat file written by Save === %%
     function openFile(~, ~)
-        [files, path] = uigetfile({'*.rhd;*.rhs;*.mat', 'Ephys files (*.rhd, *.rhs, *.mat)'}, ...
+        [files, path] = uigetfile({'*.rhd;*.rhs', 'Intan files (*.rhd, *.rhs)'; ...
+                                   '*.mat',       'MAT-files (*.mat)'; ...
+                                   '*.*',         'All files (*.*)'}, ...
             'Open Ephys file(s)', data.defaultPath, 'MultiSelect', 'on');
         drawnow; figure(fig);
         if isequal(files, 0), return; end
         files = fullfile(path, cellstr(files));
+        % All files lets anything through
+        if ~all(endsWith(lower(files), {'.rhd', '.rhs', '.mat'}))
+            uialert(fig, 'Select .rhd, .rhs or .mat files.', 'Open File');
+            return;
+        end
         isMat = endsWith(lower(files), '.mat');
         if any(isMat)
             if numel(files) > 1

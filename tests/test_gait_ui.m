@@ -340,3 +340,44 @@ children = allchild(hd.ax);   % first child is drawn on top; the time line is hi
 verifyGreaterThan(testCase,find(children==hd.timelinePose),find(children==hd.xplot));
 verifyGreaterThan(testCase,find(children==hd.timelinePose),find(children==hd.yplot));
 end
+function testFixShowCheckboxes(testCase)
+assumeTrue(testCase,usejava('desktop'),'Run UI tests in desktop MATLAB.');
+S = shared.SessionData.instance();
+assumeTrue(testCase,isempty(fieldnames(S.fig)),'Close StepSync before running UI tests.');
+cleanup = onCleanup(@()shared.exit_all(false));
+checkFixShowCheckboxes(testCase);
+end
+
+% shared with a headless run: the checkboxes hide markers and triangles only
+function checkFixShowCheckboxes(testCase)
+S = shared.SessionData.instance();
+pose.pose_viewer();
+hd = S.pose.hd;
+n = 300; t = (1:n)';
+x = 100 + 50*sin(t/30); y = 200 + 30*cos(t/40);
+x(100:104) = x(100:104) + 200;   % a short excursion: jumps, bad frames
+S.pose.table = table(x,y,ones(n,1),'VariableNames',{'paw_x','paw_y','paw_likelihood'});
+S.pose.table.Properties.UserData = {'paw'};
+S.pose.seg = []; S.pose.segBodypart = '';
+hd.bodypart.Items = {'paw'}; hd.bodypart.Enable = 'on';
+hd.fixGUI = pose.pose_fix_GUI([100 400]);
+S.pose.hd = hd;
+notify(S,'InfoChanged'); S.notifyPose('load');
+boxes = findall(hd.fixGUI,'Type','uicheckbox');
+labels = findobj(boxes,'Text','Show segment labels');
+attn = findobj(boxes,'Text','Show attention signs');
+verifyEqual(testCase,string([labels.Enable attn.Enable]),["off" "off"]);
+preview = findall(hd.fixGUI,'Type','uibutton','Text','Preview');
+preview.ButtonPushedFcn(preview,[]);
+verifyEqual(testCase,string([labels.Enable attn.Enable]),["on" "on"]);
+verifyTrue(testCase,labels.Value && attn.Value);
+labels.Value = false; labels.ValueChangedFcn(labels,[]);
+hd = S.pose.hd;
+verifyFalse(testCase,logical(hd.fix_bad_x.Visible));
+verifyTrue(testCase,logical(hd.fix_attnConflict_x.Visible));
+verifyTrue(testCase,logical(hd.fix_jump_x.Visible) && logical(hd.fix_interp_x.Visible));
+attn.Value = false; attn.ValueChangedFcn(attn,[]);
+hd = S.pose.hd;
+verifyFalse(testCase,logical(hd.fix_attnConflict_x.Visible) || logical(hd.fix_attnInterp_y.Visible));
+verifyTrue(testCase,logical(hd.fix_jump_y.Visible));
+end

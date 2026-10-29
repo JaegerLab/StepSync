@@ -52,6 +52,10 @@ S.attnInterp   = C.green;       % interpolation of at least longInterpFrac * see
 S.longBadFrac    = 1/3;
 S.longInterpFrac = 1;
 
+% layers the Pose auto fix checkboxes show/hide (interp and jump always show)
+S.labelLayers = {'good', 'userGood', 'bad', 'quest', 'userBad', 'unflag'};
+S.attnLayers  = {'attnConflict', 'attnLongBad', 'attnInterp'};
+
 % legend: order of the fix layers, and placement ('eastoutside' keeps it off the data)
 S.legendOrder = {'interp', 'jump', 'good', 'bad', 'userGood', ...
                  'userBad', 'unflag', 'quest', 'attnConflict', 'attnLongBad', 'attnInterp'};

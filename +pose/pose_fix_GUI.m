@@ -4,11 +4,11 @@ function fig = pose_fix_GUI(mousePos)
     data = shared.SessionData.instance();
     
     %% draw GUI
-    % grid 4x3
+    % grid 5x2
     mousePos(2)=mousePos(2)-120;
-    fig = uifigure('Name', 'Pose auto fix', 'Position', shared.place_window([mousePos 300 250]), ...
+    fig = uifigure('Name', 'Pose auto fix', 'Position', shared.place_window([mousePos 300 290]), ...
         'CloseRequestFcn', @onClose);
-    grid1 = uigridlayout(fig, [4 2], "RowHeight",{30,30,30,'1x'});
+    grid1 = uigridlayout(fig, [5 2], "RowHeight",{30,30,30,30,'1x'});
 
     % line 1 - high pass filter
     jumpthresh = uieditfield(grid1,'numeric','Value',20, ...
@@ -24,13 +24,19 @@ function fig = pose_fix_GUI(mousePos)
     uibutton(grid1, 'Text','Preview', 'ButtonPushedFcn', @(~,~)preview);
     uibutton(grid1, 'Text','Save As', 'ButtonPushedFcn', @(~,~)saveAs);
 
-    % line 4 - user instruction
+    % line 4 - show/hide the o/x markers and the triangles; enabled by Preview
+    showLabels = uicheckbox(grid1, 'Text', 'Show segment labels', 'Value', false, ...
+        'Enable', 'off', 'ValueChangedFcn', @(~,~)showChanged);
+    showAttn = uicheckbox(grid1, 'Text', 'Show attention signs', 'Value', false, ...
+        'Enable', 'off', 'ValueChangedFcn', @(~,~)showChanged);
+
+    % line 5 - user instruction
     txt = sprintf(['After Preview\n' ...
         'Pose :\t Ctrl-click: add/remove jump.\n' ...
         '\t\t Shift-click: toggle segment good/bad.\n' ...
         'Video:\t Drag: Refine label position.']);
     uilabel(grid1, 'Text', txt , ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 4, 'Column', [1 2]));
+        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 5, 'Column', [1 2]));
 
     autoThresh()
     autoWidth()
@@ -66,8 +72,19 @@ function fig = pose_fix_GUI(mousePos)
         data.pose.seg = seg;
         data.pose.segBodypart = field;
         data.pose.previewParameters = [jumpthresh.Value seedwidth.Value]; % for the Save As name
-        
+
+        % a new preview shows everything
+        showLabels.Value = true; showAttn.Value = true;
+        set([showLabels showAttn], 'Enable', 'on');
+        data.pose.fixShow = struct('labels', true, 'attn', true);
+
         % plot comparison
+        data.notifyPose('preview');
+    end
+
+    function showChanged()
+        if ~data.has('pose'), return; end
+        data.pose.fixShow = struct('labels', showLabels.Value, 'attn', showAttn.Value);
         data.notifyPose('preview');
     end
 
@@ -131,6 +148,11 @@ function fig = pose_fix_GUI(mousePos)
         data.pose.hd = rmfield(data.pose.hd, f);
         data.pose.seg = [];
         data.pose.segBodypart = '';
+        % no preview left to show or hide
+        if isfield(data.pose, 'fixShow'), data.pose = rmfield(data.pose, 'fixShow'); end
+        if isgraphics(fig)
+            set([showLabels showAttn], 'Value', false, 'Enable', 'off');
+        end
         % the video viewer hides its preview marker on the next PoseChanged
     end
 

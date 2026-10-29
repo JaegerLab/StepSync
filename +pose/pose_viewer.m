@@ -400,14 +400,21 @@ function fig = pose_viewer()
             'DisplayName', S.legend.attnInterp);
     end
 
-    % show/hide all fix layers of one coordinate
+    % show/hide all fix layers of one coordinate; segment labels and
+    % attention signs also follow the Pose auto fix checkboxes (fixShow)
     function hd = setFixVisible(hd, sfx, trueFalse)
+        S = pose.fix_style();
+        show = struct('labels', true, 'attn', true);
+        if isfield(data.pose, 'fixShow'), show = data.pose.fixShow; end
         f = fieldnames(hd);
         f = f(strncmp(f, 'fix_', 4) & endsWith(f, sfx));
         for i = 1:numel(f)
-            if ishghandle(hd.(f{i}))
-                hd.(f{i}).Visible = trueFalse;
-            end
+            if ~ishghandle(hd.(f{i})), continue; end
+            name = f{i}(5:end-numel(sfx));
+            on = trueFalse;
+            if ismember(name, S.labelLayers), on = on && show.labels; end
+            if ismember(name, S.attnLayers),  on = on && show.attn;   end
+            hd.(f{i}).Visible = on;
         end
     end
 

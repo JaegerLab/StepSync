@@ -11,7 +11,7 @@ corrects tracking errors. The Gait viewer then uses the corrected paws.
 
 | Format | Notes |
 |---|---|
-| DeepLabCut `.csv` | Three header rows (scorer, bodyparts, coords). The frame-index column is kept |
+| DeepLabCut `.csv` | Three header rows (scorer, bodyparts, coords). The frame-index column is kept. Multi-animal files add an `individuals` row; each body part is then listed as `<animal>_<bodypart>`, e.g. `mouse_1_nose` |
 | DeepLabCut `.h5` | The `df_with_missing` table written by DeepLabCut |
 | `.mat` | A variable `markerpos.<bodypart>.<x, y, likelihood>` |
 | SLEAP | Export the predictions from SLEAP in DeepLabCut CSV format and open that file |
@@ -120,6 +120,12 @@ and **Auto seed width**, re-estimate them. You can also type your own values.
 | Red x / red * | Rejected segment / rejected by you |
 | Grey x, grey o | Questionable / undetermined segment |
 | Orange triangles | Places worth checking: two accepted segments next to each other across a jump, a long rejected stretch (≥ ⅓ of the seed width), or a long interpolated stretch (≥ the seed width) |
+
+Two checkboxes below **Preview** and **Save As** declutter the overlay. They
+are greyed out until the first preview, and each preview checks both.
+**Show segment labels** shows or hides the o / x / * markers, and **Show
+attention signs** the triangles. The interpolated line and the jump lines
+always show.
 
 The preview is also shown on the video as a green circle next to the raw
 cyan marker.

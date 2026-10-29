@@ -28,6 +28,33 @@ verifyEqual(testCase, how, 'as is');
 verifyEqual(testCase, height(aligned), 4);
 end
 
+function testMultiAnimalCsvPrefixesBodyparts(testCase)
+% maDLC / SLEAP DLC export: an individuals row between scorer and bodyparts
+file = tempFile(testCase, '.csv');
+writelines(["scorer,M,M,M,M,M,M"
+    "individuals,mouse_1,mouse_1,mouse_1,mouse_2,mouse_2,mouse_2"
+    "bodyparts,nose,nose,nose,nose,nose,nose"
+    "coords,x,y,likelihood,x,y,likelihood"
+    "4,100.5,200.3,0.98,300.2,400.1,0.96"
+    "5,101.5,NaN,0.97,301.2,401.1,0.95"], file);
+t = pose.read_csv(file);
+verifyEqual(testCase, t.Properties.UserData, {'mouse_1_nose', 'mouse_2_nose'});
+verifyEqual(testCase, t.Properties.VariableNames, {'mouse_1_nose_x', 'mouse_1_nose_y', ...
+    'mouse_1_nose_likelihood', 'mouse_2_nose_x', 'mouse_2_nose_y', 'mouse_2_nose_likelihood'});
+verifyEqual(testCase, t.mouse_2_nose_y, [400.1; 401.1]);
+verifyTrue(testCase, isnan(t.mouse_1_nose_y(2)));
+verifyEqual(testCase, t.Properties.CustomProperties.FrameIndex, [5; 6]);
+verifyEqual(testCase, t.Properties.CustomProperties.Scorer, 'M');
+end
+
+function testHeaderOnlyCsvReads(testCase)
+file = tempFile(testCase, '.csv');
+writelines(["scorer,M,M,M"; "bodyparts,paw,paw,paw"; "coords,x,y,likelihood"], file);
+t = pose.read_csv(file);
+verifyEqual(testCase, height(t), 0);
+verifyEqual(testCase, t.Properties.UserData, {'paw'});
+end
+
 function testCroppedCsvWritesOriginalFrames(testCase)
 file = tempFile(testCase, '.csv');
 cropped = pose.crop_table(poseTable(10), (0:9)'/10, [0.35 0.62]);   % frames 5..7

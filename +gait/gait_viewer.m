@@ -786,7 +786,7 @@ function fig = gait_viewer()
 
     % close function =================================
     function onClose(src,~)
-        if ~shared.confirm_close(fig, 'StepSync Gait'), return; end
+        if ~shared.confirm_close(fig, 'gait'), return; end
         hd = data.gait.hd;
 
         % Clear data and graphic handles first

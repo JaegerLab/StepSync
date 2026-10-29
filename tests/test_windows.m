@@ -44,6 +44,15 @@ verifyFalse(testCase, isvalid(S));
 verifyEqual(testCase, shared.SessionData.instance().frameRate, 0);
 end
 
+function testCloseWithoutDataDoesNotAsk(testCase)
+S = shared.SessionData.instance();
+assumeTrue(testCase, isempty(fieldnames(S.fig)), 'Close StepSync before running this test.');
+for module = {'video', 'ephys', 'pose', 'gait'}
+    % no figure: asking would error
+    verifyTrue(testCase, shared.confirm_close([], module{1}), module{1});
+end
+end
+
 function testToolWarningStaysOffUntilLastModuleCloses(testCase)
 S = shared.SessionData.instance();
 assumeTrue(testCase, isempty(fieldnames(S.fig)), 'Close StepSync before running this test.');

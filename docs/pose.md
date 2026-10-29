@@ -65,10 +65,10 @@ through the trustworthy parts.
 | Setting | Default | Meaning |
 |---|---|---|
 | Jump thresh (px) | automatic | A frame-to-frame displacement larger than this is a jump |
-| Win width (frames) | automatic | Segments at least this long are trusted as seeds |
+| Seed width (frames) | automatic | Segments at least this long are trusted as seeds |
 
 Both are estimated when the window opens. Their buttons, **Auto jump thresh**
-and **Auto seg width**, re-estimate them. You can also type your own values.
+and **Auto seed width**, re-estimate them. You can also type your own values.
 
 ### How it works
 
@@ -80,11 +80,11 @@ and **Auto seg width**, re-estimate them. You can also type your own values.
    form two modes. The threshold is the valley between them. If no clear
    valley exists, the threshold is set at median + 4 robust SD of the log
    displacement. At least 50 valid displacements are needed.
-3. **Automatic window width.** Short tracking errors appear as *out-and-back*
+3. **Automatic seed width.** Short tracking errors appear as *out-and-back*
    excursions: a jump away, followed within a few jumps by a jump that nearly
    cancels it. The width is 1.5 × the 99th percentile of the lengths of these
    excursions, so a segment at least this long is unlikely to be an error.
-4. **Seeds.** Segments at least the window width long are taken as correct.
+4. **Seeds.** Segments at least the seed width long are taken as correct.
 5. **Propagation.** Working outwards from the seeds, round by round:
    - an undecided segment next to a good one is first marked bad (the jump
      between them shows that one of the two is wrong);
@@ -119,7 +119,7 @@ and **Auto seg width**, re-estimate them. You can also type your own values.
 | Green o / filled green o | Accepted segment / confirmed by you |
 | Red x / red * | Rejected segment / rejected by you |
 | Grey x, grey o | Questionable / undetermined segment |
-| Orange triangles | Places worth checking: two accepted segments next to each other across a jump, a long rejected stretch (≥ ⅓ of the window width), or a long interpolated stretch (≥ the window width) |
+| Orange triangles | Places worth checking: two accepted segments next to each other across a jump, a long rejected stretch (≥ ⅓ of the seed width), or a long interpolated stretch (≥ the seed width) |
 
 The preview is also shown on the video as a green circle next to the raw
 cyan marker.

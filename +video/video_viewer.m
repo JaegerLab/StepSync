@@ -558,7 +558,7 @@ function onMouseMove(~, ~)
 end
 
 function onClose(~,~)
-    if ~shared.confirm_close(fig, 'StepSync Video'), return; end
+    if ~shared.confirm_close(fig, 'video'), return; end
     % During an export: finalize the file now. The export loop resumes only
     % after this returns, possibly after Exit all deleted the session.
     if exportState.running

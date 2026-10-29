@@ -663,7 +663,7 @@ function fig = pose_viewer()
 
     % close function =================================
     function onClose(src,~)
-        if ~shared.confirm_close(fig, 'StepSync Pose'), return; end
+        if ~shared.confirm_close(fig, 'pose'), return; end
         hd=data.pose.hd;
         % close fix GUI first.
         if isfield(hd, 'fixGUI') && isgraphics(hd.fixGUI)

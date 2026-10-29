@@ -13,12 +13,12 @@ function fig = pose_fix_GUI(mousePos)
     % line 1 - high pass filter
     jumpthresh = uieditfield(grid1,'numeric','Value',20, ...
                 'ValueDisplayFormat','Jump thresh: %.1f px');
-    winwidth = uieditfield(grid1, 'numeric','Value', 60, ...
-                'ValueDisplayFormat','Win width: %d frame');
+    seedwidth = uieditfield(grid1, 'numeric','Value', 60, ...
+                'ValueDisplayFormat','Seed width: %d frame');
 
     % line 2 - auto parameter
     uibutton(grid1, 'Text', 'Auto jump thresh', 'ButtonPushedFcn', @autoThresh);
-    uibutton(grid1, 'Text', 'Auto seg width', 'ButtonPushedFcn', @autoWidth);
+    uibutton(grid1, 'Text', 'Auto seed width', 'ButtonPushedFcn', @autoWidth);
 
     % line 3 - buttons: preview, save as
     uibutton(grid1, 'Text','Preview', 'ButtonPushedFcn', @(~,~)preview);
@@ -26,10 +26,9 @@ function fig = pose_fix_GUI(mousePos)
 
     % line 4 - user instruction
     txt = sprintf(['After Preview\n' ...
-        'Pose :\t Ctrl-click: add/remove jump between 2 frames.\n' ...
+        'Pose :\t Ctrl-click: add/remove jump.\n' ...
         '\t\t Shift-click: toggle segment good/bad.\n' ...
-        '\t\t Orange: neighbouring good segments, check.\n' ...
-        'Video:\t Click and drag: Refine label position.']);
+        'Video:\t Drag: Refine label position.']);
     uilabel(grid1, 'Text', txt , ...
         'Layout', matlab.ui.layout.GridLayoutOptions('Row', 4, 'Column', [1 2]));
 
@@ -56,7 +55,7 @@ function fig = pose_fix_GUI(mousePos)
         ydata = data.pose.table.([field '_y']);
         
         [tempX, tempY, mask, seg] = pose.pose_fix(xdata,ydata, ...
-            jumpthresh.Value, winwidth.Value);
+            jumpthresh.Value, seedwidth.Value);
 
         data.pose.table.temp_x = tempX;
         data.pose.table.temp_y = tempY;
@@ -66,7 +65,7 @@ function fig = pose_fix_GUI(mousePos)
         % segments, for display and click editing in pose_viewer
         data.pose.seg = seg;
         data.pose.segBodypart = field;
-        data.pose.previewParameters = [jumpthresh.Value winwidth.Value]; % for the Save As name
+        data.pose.previewParameters = [jumpthresh.Value seedwidth.Value]; % for the Save As name
         
         % plot comparison
         data.notifyPose('preview');
@@ -86,7 +85,7 @@ function fig = pose_fix_GUI(mousePos)
         opt.WindowStyle = 'modal';
         opt.Interpreter = 'none';
         % name after the previewed parameters; the fields may have changed since
-        params = [jumpthresh.Value winwidth.Value];
+        params = [jumpthresh.Value seedwidth.Value];
         if isfield(data.pose, 'previewParameters') && numel(data.pose.previewParameters) == 2
             params = data.pose.previewParameters;
         end
@@ -151,7 +150,7 @@ function fig = pose_fix_GUI(mousePos)
         ydata = data.pose.table.([field '_y']);
         thr = jumpthresh.Value;
         [w, ~] = pose.auto_window_width(xdata, ydata, thr);
-        winwidth.Value = round(w);
+        seedwidth.Value = round(w);
     end
 
     function onClose(src, ~)

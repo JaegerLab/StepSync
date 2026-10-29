@@ -625,7 +625,7 @@ function fig = ephys_viewer()
 
     % close function
     function onClose(~,~)
-        if ~shared.confirm_close(fig, 'StepSync Ephys'), return; end
+        if ~shared.confirm_close(fig, 'ephys'), return; end
         hd = data.ephys.hd;
         % Clear all the handles and plots;
         field = fields(hd);

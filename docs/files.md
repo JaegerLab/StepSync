@@ -43,7 +43,7 @@ the current **zoom window**. The default file name ends in `_StepSync` (or
 | `fileFormat`, `formatVersion` | `'StepSync Ephys'`, `1` |
 | `ephys` | Channel names and units, camera trigger, channel map, source, `timeRange` (empty for full length) |
 | `raw` | `data` (samples × channels), `t` (s), `sampleRate` (Hz) |
-| `processed1`, `processed2`, … | As `raw`, plus `parameters`: `FilterType`, `HighPassFreq`, `LowPassFreq`, `FiltFilt`, `Rectify`, `DownSampleRate`, `Source` |
+| `processed1`, `processed2`, … | As `raw`, plus `parameters`: `FilterType`, `HighPassFreq`, `LowPassFreq`, `FiltFilt`, `Rectify`, `SmoothWindow`, `DownSampleRate`, `Source` |
 
 Times are on the original recording clock, also in a zoom-window save.
 Ephys `File > Open File` with a `.mat` file lists the stored types with their sizes, so you can load

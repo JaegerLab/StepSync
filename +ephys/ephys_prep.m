@@ -14,8 +14,10 @@ function [newData, newT] = ephys_prep(data, t, options, fs)
 %           bandpass/bandstop use the band between the two frequencies
 %       FiltFilt: boolean. true uses filtfilt, false (default) uses filter
 %       Rectify: boolean. true or false(default)
+%       SmoothWindow: a number. moving average window in samples
 %       DownSampleRate: a number. frequency to down sample to: smooth, then
-%           interpolate at multiples of 1/DownSampleRate from time 0
+%           interpolate at multiples of 1/DownSampleRate from time 0.
+%           Without SmoothWindow, the window is 2.5*fs/DownSampleRate
 %  fs: sample rate of data (default: from t)
 % Outputs:
 %  newData: processed data. data at negative time are truncated.
@@ -45,12 +47,22 @@ if isfield(options, 'Rectify') && options.Rectify
     newData = abs(newData);
 end
 
-if isfield(options, 'DownSampleRate')
-    % smooth
-    waitbar(1/3, hd, 'Smoothing')
+% smooth: the given window, or one that suits the down sample rate
+smoothWidth = [];
+if isfield(options, 'SmoothWindow')
+    validateattributes(options.SmoothWindow, {'numeric'}, {'scalar','integer','positive'});
+    smoothWidth = options.SmoothWindow;
+elseif isfield(options, 'DownSampleRate')
     validateattributes(options.DownSampleRate, {'numeric'}, {'scalar','real','finite','positive','<=',fs});
     smoothWidth = max(1, round(2.5 * fs / options.DownSampleRate));
+end
+if ~isempty(smoothWidth) && smoothWidth > 1
+    waitbar(1/3, hd, 'Smoothing')
     newData = shared.fastsmooth(newData, smoothWidth,1,1);
+end
+
+if isfield(options, 'DownSampleRate')
+    validateattributes(options.DownSampleRate, {'numeric'}, {'scalar','real','finite','positive','<=',fs});
 
     % interpolate on an exact grid k/DownSampleRate, from time 0
     waitbar(2/3, hd, 'Downsampling')

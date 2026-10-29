@@ -279,6 +279,14 @@ callback = preprocess.ButtonPushedFcn; callback(preprocess,[]);
 prep = S.ephys.hd.prepGUI;
 verifyFalse(testCase,logical(hd.deleteType.Enable));
 rate = findall(prep,'Type','uinumericeditfield','Value',200); rate.Value = 300;
+% the frequency signs show what is kept, swapped for band stop
+high = findall(prep,'Type','uinumericeditfield','Value',500);
+low = findall(prep,'Type','uinumericeditfield','Value',5000);
+filterType = findall(prep,'Type','uidropdown');
+verifyEqual(testCase,{high.ValueDisplayFormat low.ValueDisplayFormat},{'> %g Hz','< %g Hz'});
+filterType.Value = 'bandstop'; callback = filterType.ValueChangedFcn; callback(filterType,[]);
+verifyEqual(testCase,{high.ValueDisplayFormat low.ValueDisplayFormat},{'< %g Hz','> %g Hz'});
+filterType.Value = 'highpass'; callback(filterType,[]);
 apply = findall(prep,'Type','uibutton','Text','Apply & Close');
 callback = apply.ButtonPushedFcn; callback(apply,[]);
 verifyFalse(testCase,isgraphics(prep));
@@ -289,6 +297,7 @@ p = S.ephys.processed(1);
 verifyEqual(testCase,p.sampleRate,300);   % exactly the requested rate
 verifyEqual(testCase,p.parameters.Source,'Raw');
 verifyEqual(testCase,p.parameters.DownSampleRate,300);
+verifyFalse(testCase,isfield(p.parameters,'SmoothWindow'));   % Fast smooth is off by default
 % processing a processed type records it as the source
 callback = preprocess.ButtonPushedFcn; callback(preprocess,[]);
 prep = S.ephys.hd.prepGUI;

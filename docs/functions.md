@@ -71,7 +71,8 @@ This is what **Pre-Process** in the [Ephys viewer](ephys.md) runs.
 | `LowPassFreq` | Low-pass cutoff (Hz); a band edge for band filters. A band filter passes or stops the band between the two frequencies |
 | `FiltFilt` | `true`: zero-phase filtering with `filtfilt`. `false` (default): causal `filter` |
 | `Rectify` | `true`: absolute value. Default `false` |
-| `DownSampleRate` | New sample rate (Hz). The data are smoothed with a moving window of 2.5 × `fs/DownSampleRate` samples, then linearly interpolated at `k/DownSampleRate` (*k* = 0, 1, 2, …), so the rate is exact |
+| `SmoothWindow` | Moving-average window in samples (a positive integer), applied after rectifying |
+| `DownSampleRate` | New sample rate (Hz). The data are smoothed with a moving window of `SmoothWindow` samples, or 2.5 × `fs/DownSampleRate` without it, then linearly interpolated at `k/DownSampleRate` (*k* = 0, 1, 2, …), so the rate is exact |
 
 | Output | Description |
 |---|---|

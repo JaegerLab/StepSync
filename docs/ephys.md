@@ -88,25 +88,36 @@ second down-sampling of *Processed 1*). The window shows the settings of the
 selected type: the ones a processed type was made with, or the defaults
 below for `Raw`. Selecting another type also discards the preview.
 
-![Ephys Pre-Process window: high-pass filter, rectify and down-sample to 200 Hz](images/preprocess.png)
+![Ephys Pre-Process window: band-stop filter (< 500 Hz, > 5000 Hz), rectify and down-sample to 200 Hz](images/preprocess.png)
 
 | Setting | Default | Description |
 |---|---|---|
 | Filter | on, High pass | 4th-order IIR (Butterworth): High pass, Low pass, Band pass or Band stop |
-| High | 500 Hz | High-pass half-power frequency; a band edge for Band pass and Band stop |
-| Low | 5000 Hz | Low-pass half-power frequency; a band edge for Band pass and Band stop |
-| Filtfilt | off | Filter forwards and backwards (zero phase) instead of a causal filter |
+| FiltFilt | off | Filter forwards and backwards (zero phase) instead of a causal filter |
+| > *f* Hz | 500 Hz | High-pass half-power frequency; a band edge for Band pass and Band stop |
+| < *f* Hz | 5000 Hz | Low-pass half-power frequency; a band edge for Band pass and Band stop |
 | Rectify | on | Absolute value |
-| Down Sample | on, 200 Hz | Smooth, then resample at exactly the given sample rate |
+| Fast smooth | off, 250 samples | Moving average over the given number of samples |
+| Down sample | on, 200 Hz | Smooth, then resample at exactly the given sample rate |
 
-Only the settings that apply are enabled: Filtfilt and the filter type need
-Filter, High pass uses only High, Low pass only Low, and the band filters both.
+Only the settings that apply are enabled: FiltFilt and the filter type need
+Filter, High pass uses only the > frequency, Low pass only the < one, and the
+band filters both. The signs show which frequencies are kept, so for Band
+stop they swap: < the lower edge and > the upper one.
 
-When down-sampling, the signal is first smoothed with a moving average of
-2.5 *fs* / rate samples, which acts as an envelope and anti-aliasing filter.
-It is then linearly interpolated at multiples of 1 / rate from time 0, so
+**Fast smooth** smooths without changing the sample rate, for example to get
+an envelope at the full rate. When down-sampling, the signal is first
+smoothed, which acts as an envelope and anti-aliasing filter: with the Fast
+smooth window if it is checked, otherwise with a moving average of
+2.5 *fs* / rate samples. It is then linearly interpolated at multiples of 1 / rate from time 0, so
 the new rate is exactly the value entered. Samples before
 time 0 are removed.
+
+A Fast smooth window shorter than the spacing of the down-sampled points
+(*fs* / rate samples, e.g. 100 samples from 20 kHz to 200 Hz) skips samples,
+so fast changes alias into the result. Preview and Apply & Close then ask
+before going on. **Process anyway** is fine when a low-pass filter has already
+removed what lies above half the new rate.
 
 - **Preview** processes the selected channel only and draws it in yellow.
 - **Apply & Close** processes all channels and adds a new data type

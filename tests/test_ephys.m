@@ -136,6 +136,21 @@ verifyEqual(testCase, newT, t(t>=0));
 verifyEqual(testCase, y, abs(x(t>=0)));
 end
 
+function testPrepSmoothWithoutDownSampling(testCase)
+fs = 1000;
+t = (0:999)'/fs;
+x = randn(numel(t), 2);
+[y, newT] = ephys.ephys_prep(x, t, struct('SmoothWindow', 5), fs);
+verifyEqual(testCase, newT, t);   % same samples
+verifyEqual(testCase, y(100,:), mean(x(98:102,:)), 'AbsTol', 1e-12);   % 5-sample moving average
+% with down sampling, the given window replaces the automatic one
+y1 = ephys.ephys_prep(x, t, struct('SmoothWindow', 1, 'DownSampleRate', 100), fs);
+verifyEqual(testCase, y1(11,:), x(101,:), 'AbsTol', 1e-12);   % t = 0.1 s, not smoothed
+y2 = ephys.ephys_prep(x, t, struct('DownSampleRate', 100), fs);
+verifyNotEqual(testCase, y2(11,:), x(101,:));
+verifyError(testCase, @()ephys.ephys_prep(x, t, struct('SmoothWindow', 2.5), fs), 'MATLAB:expectedInteger');
+end
+
 function testPrepFilterTypes(testCase)
 fs = 1000;
 t = (0:9999)'/fs;

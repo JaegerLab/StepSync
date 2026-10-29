@@ -6,44 +6,50 @@ function fig = ephys_prep_GUI(mousePos)
     data = shared.SessionData.instance();
 
     %% draw GUI
-    % grid 4x3
-    mousePos(2)=mousePos(2)-150;
-    fig = uifigure('Name', 'Ephys Pre-Process', 'Position', shared.place_window([mousePos 400 150]), ...
+    % grid 6x3
+    mousePos(2)=mousePos(2)-210;
+    fig = uifigure('Name', 'Ephys Pre-Process', 'Position', shared.place_window([mousePos 400 210]), ...
         'CloseRequestFcn', @onClose);
-    grid1 = uigridlayout(fig, [4 3]);
+    grid1 = uigridlayout(fig, [6 3]);
+    at = @(row, col) matlab.ui.layout.GridLayoutOptions('Row', row, 'Column', col);
 
-    % line 1 - filter, its type and the high pass frequency
-    chkFilter = uicheckbox(grid1,'Text', 'Filter', 'Value', 1, ...
+    % line 1 - filter and filtfilt
+    chkFilter = uicheckbox(grid1,'Text', 'Filter', 'Value', 1, 'Layout', at(1, 1), ...
         'ValueChangedFcn', @(~,~)updateEnable());
+    chkFiltFilt = uicheckbox(grid1, 'Text', 'FiltFilt', 'Value', 0, 'Layout', at(1, 2));
+
+    % line 2 - filter type, high pass and low pass frequencies
     ddFilterType = uidropdown(grid1, 'Items', {'High pass', 'Low pass', 'Band pass', 'Band stop'}, ...
         'ItemsData', {'highpass', 'lowpass', 'bandpass', 'bandstop'}, 'Value', 'highpass', ...
+        'Layout', at(2, 1), 'ValueChangedFcn', @(~,~)updateEnable());
+    editHighPass = uieditfield(grid1, 'numeric', 'Value', 500, 'Layout', at(2, 2));
+    editLowPass = uieditfield(grid1, 'numeric', 'Value', 5000, 'Layout', at(2, 3));
+
+    % line 3 - rectify
+    chkRectify = uicheckbox(grid1,'Text', 'Rectify', 'Value',1, 'Layout', at(3, 1));
+
+    % line 4 - moving average smooth
+    chkSmooth = uicheckbox(grid1, 'Text', 'Fast smooth', 'Value', 0, 'Layout', at(4, 1), ...
         'ValueChangedFcn', @(~,~)updateEnable());
-    editHighPass = uieditfield(grid1, 'numeric', 'Value', 500, ...
-        'ValueDisplayFormat', 'High: %g Hz');
+    editSmooth = uieditfield(grid1, 'numeric', 'Value', 250, 'Limits', [1 Inf], ...
+        'RoundFractionalValues', 'on', 'ValueDisplayFormat', 'Moving average window: %g samples', ...
+        'Layout', at(4, [2 3]));
 
-    % line 2 - filtfilt and the low pass frequency
-    chkFiltFilt = uicheckbox(grid1, 'Text', 'Filtfilt', 'Value', 0);
-    editLowPass = uieditfield(grid1, 'numeric', 'Value', 5000, ...
-        'ValueDisplayFormat', 'Low: %g Hz', ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 2, 'Column', 3));
-
-    % line 3 - rectify, smooth and downsample
-    chkRectify = uicheckbox(grid1,'Text', 'Rectify', 'Value',1, ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 3, 'Column', 1));
-    chkDownSample = uicheckbox(grid1,'Text', 'Down Sample', 'Value',1, ...
+    % line 5 - downsample
+    chkDownSample = uicheckbox(grid1,'Text', 'Down sample', 'Value',1, 'Layout', at(5, 1), ...
         'ValueChangedFcn', @(~,~)updateEnable());
     editDownRate = uieditfield(grid1, 'numeric', 'Value', 200, ...
-        'ValueDisplayFormat', 'sample rate: %g Hz');
+        'ValueDisplayFormat', 'Sample rate: %g Hz', 'Layout', at(5, [2 3]));
 
-    % line 4 - buttons: preview, save&close, cancel
-    uibutton(grid1, 'Text','Preview', 'ButtonPushedFcn', @preview, ...
-        'Layout', matlab.ui.layout.GridLayoutOptions('Row', 4, 'Column', 1));
-    uibutton(grid1, 'Text','Apply & Close', 'ButtonPushedFcn', @saveClose);
-    uibutton(grid1, 'Text','Cancel', 'ButtonPushedFcn', @cancelClose);
+    % line 6 - buttons: preview, save&close, cancel
+    uibutton(grid1, 'Text','Preview', 'ButtonPushedFcn', @preview, 'Layout', at(6, 1));
+    uibutton(grid1, 'Text','Apply & Close', 'ButtonPushedFcn', @saveClose, 'Layout', at(6, 2));
+    uibutton(grid1, 'Text','Cancel', 'ButtonPushedFcn', @cancelClose, 'Layout', at(6, 3));
 
     % show the settings of the selected data type: those it was made with
     % (processed), or the defaults (raw)
-    defaults = getParameters();
+    defaults = getParameters();   % before updateEnable, so both frequencies are in
+    defaults.SmoothWindow = editSmooth.Value;
     updateEnable();
     lastType = '';
     typeListener = addlistener(data, 'EphysChanged', @(~,~)showTypeParameters());
@@ -86,6 +92,9 @@ function fig = ephys_prep_GUI(mousePos)
         chkFiltFilt.Value = defaults.FiltFilt;
         if isfield(p, 'FiltFilt'), chkFiltFilt.Value = p.FiltFilt; end
         chkRectify.Value = isfield(p, 'Rectify') && p.Rectify;
+        chkSmooth.Value = isfield(p, 'SmoothWindow');
+        editSmooth.Value = defaults.SmoothWindow;
+        if chkSmooth.Value, editSmooth.Value = p.SmoothWindow; end
         chkDownSample.Value = isfield(p, 'DownSampleRate');
         editDownRate.Value = defaults.DownSampleRate;
         if chkDownSample.Value, editDownRate.Value = p.DownSampleRate; end
@@ -93,7 +102,8 @@ function fig = ephys_prep_GUI(mousePos)
     end
 
     % filter settings only with Filter on, and only the frequencies the
-    % filter type uses
+    % filter type uses. The signs show the frequencies kept: > high pass,
+    % < low pass, and the other way round for band stop.
     function updateEnable()
         on = chkFilter.Value;
         type = ddFilterType.Value;
@@ -101,6 +111,11 @@ function fig = ephys_prep_GUI(mousePos)
         chkFiltFilt.Enable = on;
         editHighPass.Enable = on && ~strcmp(type, 'lowpass');
         editLowPass.Enable = on && ~strcmp(type, 'highpass');
+        signs = '><';
+        if strcmp(type, 'bandstop'), signs = '<>'; end
+        editHighPass.ValueDisplayFormat = [signs(1) ' %g Hz'];
+        editLowPass.ValueDisplayFormat = [signs(2) ' %g Hz'];
+        editSmooth.Enable = chkSmooth.Value;
         editDownRate.Enable = chkDownSample.Value;
     end
 
@@ -158,6 +173,9 @@ function fig = ephys_prep_GUI(mousePos)
             parameters.FiltFilt = chkFiltFilt.Value;
         end
         parameters.Rectify = chkRectify.Value;
+        if chkSmooth.Value
+            parameters.SmoothWindow = editSmooth.Value;
+        end
         if chkDownSample.Value
             parameters.DownSampleRate = editDownRate.Value;
         end
@@ -185,6 +203,25 @@ function fig = ephys_prep_GUI(mousePos)
             uialert(fig, sprintf('%s: too high for the selected data (%g Hz, Nyquist %g Hz).', ...
                 strjoin(problems, ', '), src.sampleRate, nyquist), 'Pre-Process');
         end
+        if ok, ok = smoothCoversDownSample(src, parameters); end
+    end
+
+    % A smooth window shorter than the spacing of the down-sampled points
+    % skips samples, so fast changes alias. Ask before going on; e.g. a low
+    % pass filter may already have removed them.
+    function ok = smoothCoversDownSample(src, parameters)
+        ok = true;
+        if ~isfield(parameters, 'SmoothWindow') || ~isfield(parameters, 'DownSampleRate'), return; end
+        spacing = src.sampleRate / parameters.DownSampleRate;
+        if parameters.SmoothWindow >= spacing, return; end
+        answer = uiconfirm(fig, sprintf(['The %g-sample smooth window is shorter than the %g samples ' ...
+            'between down-sampled points (%g Hz to %g Hz), so some samples are skipped and fast ' ...
+            'changes alias. Without Fast smooth, the window is %g samples (2.5 times the spacing).'], ...
+            parameters.SmoothWindow, spacing, src.sampleRate, parameters.DownSampleRate, ...
+            max(1, round(2.5 * spacing))), 'Pre-Process', ...
+            'Options', {'Process anyway', 'Cancel'}, 'DefaultOption', 2, 'CancelOption', 2, ...
+            'Icon', 'warning');
+        ok = strcmp(answer, 'Process anyway');
     end
 
     function cancelClose(~,~)

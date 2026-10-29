@@ -95,14 +95,14 @@ bp = ephys.ephys_prep(raw, t, opt, 30000);
 
 ```matlab
 [xFix, yFix, mask, seg] = pose.pose_fix(x, y)
-[xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, winWidth)
-[xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, winWidth, maskOrSeg)
+[xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, seedWidth)
+[xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, seedWidth, maskOrSeg)
 [...] = pose.pose_fix(..., visualize)
 ```
 
 Corrects short tracking errors in one body part's trajectory. The trace is cut
 into segments at jumps larger than `jumpThresh`. Segments at least
-`winWidth` frames long are trusted seeds, and the remaining segments are
+`seedWidth` frames long are trusted seeds, and the remaining segments are
 accepted or rejected by comparing them with an interpolation through the
 trusted frames. The rejected frames are then replaced by that interpolation.
 The algorithm is described in [Pose viewer and correction](pose.md). This is
@@ -112,7 +112,7 @@ what **Pose Fix** runs.
 |---|---|
 | `x`, `y` | Coordinates of one body part, in pixels (vectors of equal length) |
 | `jumpThresh` | Jump threshold (pixels). `[]` or omitted: estimated by `pose.auto_jump_threshold` |
-| `winWidth` | Seed width (frames). `[]` or omitted: estimated by `pose.auto_window_width` |
+| `seedWidth` | Seed width (frames). `[]` or omitted: estimated by `pose.auto_window_width` |
 | `maskOrSeg` | Optional. A logical vector (one value per frame) marks frames you already know to be good (`true`) or bad (`false`): good runs become seeds, bad runs are rejected, and nothing is propagated. A segment structure (`seg` from an earlier call, possibly edited) re-runs the algorithm only around the edited segments |
 | `visualize` | `true` to plot the result, with the same layers and styles as the correction overlay in the Pose viewer (`pose.fix_style`), plus the suggested fix at each conflict. Default `false` |
 
@@ -138,7 +138,7 @@ seg.flag(12) = 2; seg.isNew(12) = true;
 [xf, yf, good, seg] = pose.pose_fix(T.nose_x, T.nose_y, [], [], seg);
 ```
 
-When a segment structure is passed, `jumpThresh` and `winWidth` default to
+When a segment structure is passed, `jumpThresh` and `seedWidth` default to
 the values stored in it. To add or remove a jump in `seg`, use
 `pose.pose_seg_toggle_jump`.
 

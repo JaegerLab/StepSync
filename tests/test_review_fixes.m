@@ -75,7 +75,7 @@ verifyFalse(testCase,any(startsWith(loaded.Properties.VariableNames,'temp_')));
 end
 
 function testLikelihoodConversionIsGradedAndRepeatable(testCase)
-seg = struct('flag',[2;2;1;-1;-2;-3;0], 'len',[10;1;1;1;1;1;1], 'winWidth',5);
+seg = struct('flag',[2;2;1;-1;-2;-3;0], 'len',[10;1;1;1;1;1;1], 'seedWidth',5);
 p = pose.seg_likelihood(seg);
 verifyEqual(testCase,p,[0.95*ones(10,1);1;0.9;0.1;0.5;0;0.5],'AbsTol',1e-12);
 verifyEqual(testCase,p,pose.seg_likelihood(seg));

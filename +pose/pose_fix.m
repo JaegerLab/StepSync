@@ -1,12 +1,12 @@
-function [xFix, yFix, mask, seg] = pose_fix(x, y, jumpThresh, winWidth, maskOrSeg, visualize)
+function [xFix, yFix, mask, seg] = pose_fix(x, y, jumpThresh, seedWidth, maskOrSeg, visualize)
 %POSE_FIX  Fix pose mislabels by progressive interpolation from seeds.
 %
 %   [xFix, yFix, mask, seg] = pose.pose_fix(x, y)
-%   [xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, winWidth)
-%   [xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, winWidth, maskOrSeg)
+%   [xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, seedWidth)
+%   [xFix, yFix, mask, seg] = pose.pose_fix(x, y, jumpThresh, seedWidth, maskOrSeg)
 %   [...] = pose.pose_fix(..., visualize)
 %
-%   The trace is cut into segments at jumps. Segments at least winWidth
+%   The trace is cut into segments at jumps. Segments at least seedWidth
 %   long are seeds. Propagation then repeats:
 %     1. undecided segments next to a good one are bad (a jump separates
 %        them from a known-good position);
@@ -25,7 +25,7 @@ function [xFix, yFix, mask, seg] = pose_fix(x, y, jumpThresh, winWidth, maskOrSe
 %     x, y         coordinates of one body part (vectors, same length)
 %     jumpThresh  jump threshold. [] -> seg.jumpThresh if a segment
 %                  structure is given, else pose.auto_jump_threshold.
-%     winWidth    seed width in frames. [] -> seg.winWidth if given,
+%     seedWidth    seed width in frames. [] -> seg.seedWidth if given,
 %                  else pose.auto_window_width (only computed if needed).
 %     maskOrSeg  optional:
 %                  - logical (or 0/1) vector, one value per frame: segments
@@ -35,7 +35,7 @@ function [xFix, yFix, mask, seg] = pose_fix(x, y, jumpThresh, winWidth, maskOrSe
 %                    * segments with isNew = true were edited. A positive
 %                      flag makes it a seed, a negative one locks it bad,
 %                      flag 0 (new geometry after split/merge) re-judges it
-%                      (seed if len >= winWidth, else propagation). Only
+%                      (seed if len >= seedWidth, else propagation). Only
 %                      the stretch between the nearest original seeds on
 %                      either side is rechecked.
 %                    * any other flag-0 segments are propagated as usual.
@@ -77,7 +77,7 @@ if numel(y) ~= N
     error('pose_fix:size', 'x and y must have the same length.');
 end
 if nargin < 3, jumpThresh = []; end
-if nargin < 4, winWidth = []; end
+if nargin < 4, seedWidth = []; end
 if nargin < 5, maskOrSeg = []; end
 if nargin < 6 || isempty(visualize), visualize = false; end
 
@@ -103,13 +103,13 @@ end
 switch mode
     case 'full'
         if isempty(jumpThresh), jumpThresh = pose.auto_jump_threshold(x, y); end
-        if isempty(winWidth),   winWidth = pose.auto_window_width(x, y, jumpThresh); end
-        seg = pose.pose_seg_build(x, y, jumpThresh, winWidth);
+        if isempty(seedWidth),   seedWidth = pose.auto_window_width(x, y, jumpThresh); end
+        seg = pose.pose_seg_build(x, y, jumpThresh, seedWidth);
         seg = propagate(seg, x, y, 1, numel(seg.start), P);
 
     case 'mask'
         if isempty(jumpThresh), jumpThresh = pose.auto_jump_threshold(x, y); end
-        seg = pose.pose_seg_build(x, y, jumpThresh, winWidth, find(diff(m) ~= 0));
+        seg = pose.pose_seg_build(x, y, jumpThresh, seedWidth, find(diff(m) ~= 0));
         good = m(seg.start);
         seg.flag(good)  = SEED;
         seg.flag(~good) = REJECT;
@@ -122,14 +122,14 @@ switch mode
         if isnan(seg.jumpThresh)
             seg.jumpThresh = pose.auto_jump_threshold(x, y);
         end
-        if ~isempty(winWidth), seg.winWidth = winWidth; end
+        if ~isempty(seedWidth), seg.seedWidth = seedWidth; end
         M = numel(seg.start);
         region = false(M, 1);
 
         newIdx = find(seg.isNew);
         if ~isempty(newIdx)
-            if any(seg.flag(newIdx) == 0) && isnan(seg.winWidth)
-                seg.winWidth = pose.auto_window_width(x, y, seg.jumpThresh);
+            if any(seg.flag(newIdx) == 0) && isnan(seg.seedWidth)
+                seg.seedWidth = pose.auto_window_width(x, y, seg.jumpThresh);
             end
             % region: between nearest original (non-new) seeds
             isOrigSeed = (seg.flag == SEED) & ~seg.isNew;
@@ -146,7 +146,7 @@ switch mode
                     seg.flag(k) = SEED;
                 elseif seg.flag(k) < 0
                     seg.flag(k) = REJECT;
-                elseif seg.len(k) >= seg.winWidth
+                elseif seg.len(k) >= seg.seedWidth
                     seg.flag(k) = SEED;
                 end
                 if seg.flag(k) ~= 0, seg.round(k) = 0; else, seg.round(k) = NaN; end
@@ -388,7 +388,7 @@ end
 seg.isNew = logical(seg.isNew(:));
 seg.nFrames = N;
 if ~isfield(seg, 'jumpThresh') || isempty(seg.jumpThresh), seg.jumpThresh = NaN; end
-if ~isfield(seg, 'winWidth')   || isempty(seg.winWidth),   seg.winWidth = NaN;   end
+if ~isfield(seg, 'seedWidth')   || isempty(seg.seedWidth),   seg.seedWidth = NaN;   end
 end
 
 % ==========================================================================
@@ -399,7 +399,7 @@ S = pose.fix_style();
 N = numel(x); t = (1:N)';
 fe = repelem(seg.flag, seg.len);            % flag per frame
 good = fe > 0;
-win = seg.winWidth;
+win = seg.seedWidth;
 mk = {'LineStyle', 'none', 'MarkerSize', S.markSize, 'LineWidth', S.markWidth};
 attn = {'LineStyle', 'none', 'Marker', S.attnMarker, 'MarkerSize', S.attnSize, ...
     'LineWidth', S.attnWidth};

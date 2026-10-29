@@ -337,7 +337,7 @@ function fig = pose_viewer()
     % draw all fix layers for one coordinate (suffix '_x' or '_y')
     function hd = drawFix(hd, sfx, t, v, vfix, seg, S)
         fe   = repelem(seg.flag, seg.len);          % flag per frame
-        win  = seg.winWidth;
+        win  = seg.seedWidth;
         good = fe > 0;
         clickable = {'ButtonDownFcn', @axClicked};
         unclickable = {'HitTest', 'off'};

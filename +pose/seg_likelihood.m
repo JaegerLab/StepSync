@@ -7,7 +7,7 @@ function p = seg_likelihood(seg)
     %   _likelihood column says how much each frame can be trusted.
     
     % ---- values per flag (tune here) -----------------------------------------
-    P_USER_GOOD = 1;      % flag  2, shorter than winWidth (confirmed by the user)
+    P_USER_GOOD = 1;      % flag  2, shorter than seedWidth (confirmed by the user)
     P_SEED      = 0.95;   % flag  2, seed made by the algorithm
     P_GOOD      = 0.9;    % flag  1, presumed good (propagation)
     P_UNSURE    = 0.5;    % flag -2 questionable, flag 0 unflagged
@@ -16,7 +16,7 @@ function p = seg_likelihood(seg)
     
     f = seg.flag(:);
     isSeed   = f == 2;
-    userGood = isSeed & ~(seg.len(:) >= seg.winWidth);   % NaN winWidth: all user
+    userGood = isSeed & ~(seg.len(:) >= seg.seedWidth);   % NaN seedWidth: all user
     
     pk = P_UNSURE * ones(size(f));
     pk(isSeed)   = P_SEED;

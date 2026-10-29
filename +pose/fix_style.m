@@ -47,8 +47,8 @@ S.attnMarker   = '^';
 S.attnSize     = 14;
 S.attnWidth    = 1.5;
 S.attnConflict = C.orange;      % neighbouring good segments
-S.attnLongBad  = C.red;         % bad segment of at least longBadFrac * winWidth
-S.attnInterp   = C.green;       % interpolation of at least longInterpFrac * winWidth
+S.attnLongBad  = C.red;         % bad segment of at least longBadFrac * seedWidth
+S.attnInterp   = C.green;       % interpolation of at least longInterpFrac * seedWidth
 S.longBadFrac    = 1/3;
 S.longInterpFrac = 1;
 

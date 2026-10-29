@@ -1,21 +1,21 @@
-function seg = pose_seg_build(x, y, jumpThresh, winWidth, extraBreaks)
+function seg = pose_seg_build(x, y, jumpThresh, seedWidth, extraBreaks)
 %POSE_SEG_BUILD  Split a pose trajectory into segments at jumps.
 %
 %   seg = pose.pose_seg_build(x, y, jumpThresh)
-%   seg = pose.pose_seg_build(x, y, jumpThresh, winWidth)
-%   seg = pose.pose_seg_build(x, y, jumpThresh, winWidth, extraBreaks)
+%   seg = pose.pose_seg_build(x, y, jumpThresh, seedWidth)
+%   seg = pose.pose_seg_build(x, y, jumpThresh, seedWidth, extraBreaks)
 %
 %   A jump is a frame-to-frame displacement > jumpThresh, or a NaN
 %   displacement. Segment m runs from seg.start(m) to seg.stop(m); jump k
 %   lies between segment k and k+1, i.e. after frame seg.stop(k).
-%   If winWidth is given, segments with len >= winWidth are flagged as
+%   If seedWidth is given, segments with len >= seedWidth are flagged as
 %   seeds. extraBreaks (frame indices t) adds boundaries after frame t,
 %   e.g. where a mask changes value.
 %
 %   Segment structure (shared by pose_fix and auto_window_width)
 %   Per segment (M x 1):
 %     start, stop, len   first frame, last frame, number of frames
-%     flag               2  seed (>= winWidth, or confirmed by the user)
+%     flag               2  seed (>= seedWidth, or confirmed by the user)
 %                        1  good, recovered by propagation
 %                        0  not flagged yet
 %                       -1  bad (jumped away from a good neighbour)
@@ -31,9 +31,9 @@ function seg = pose_seg_build(x, y, jumpThresh, winWidth, extraBreaks)
 %     suggestion         '', 'merge', 'split' or 'review' (conflicts only)
 %     suggestAt         frame t to pass to pose_seg_toggle_jump (NaN if none)
 %   Scalars:
-%     nFrames, jumpThresh, winWidth (NaN if unknown)
+%     nFrames, jumpThresh, seedWidth (NaN if unknown)
 
-if nargin < 4 || isempty(winWidth), winWidth = NaN; end
+if nargin < 4 || isempty(seedWidth), seedWidth = NaN; end
 if nargin < 5, extraBreaks = []; end
 
 x = x(:); y = y(:);
@@ -60,10 +60,10 @@ seg.suggestion = repmat({''}, M - 1, 1);
 seg.suggestAt = nan(M - 1, 1);
 seg.nFrames    = N;
 seg.jumpThresh = jumpThresh;
-seg.winWidth   = winWidth;
+seg.seedWidth   = seedWidth;
 
-if ~isnan(winWidth)
-    isSeed = seg.len >= winWidth;
+if ~isnan(seedWidth)
+    isSeed = seg.len >= seedWidth;
     seg.flag(isSeed)  = 2;
     seg.round(isSeed) = 0;
 end

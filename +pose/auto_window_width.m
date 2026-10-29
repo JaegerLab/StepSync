@@ -261,7 +261,7 @@ semilogx(cv.w, 100 * cv.contamination, 'm-', 'LineWidth', 1.5);
 semilogx(cv.w, 100 * cv.errSurviving, 'Color', [0.9 0.5 0], 'LineWidth', 1.5);
 yl = ylim;
 plot([w w], yl, 'r-', 'LineWidth', 1.5);
-xlabel('window width w (frames)');
+xlabel('seed width w (frames)');
 ylabel('%');
 legend({'frames kept', 'flagged among segs \geq w', ...
         'errors surviving w', sprintf('w = %d', w)}, 'Location', 'east');

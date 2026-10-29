@@ -7,7 +7,7 @@ function seg = pose_seg_toggle_jump(seg, t)
 %   are merged. Otherwise the segment containing frames t and t+1 is split
 %   there. The resulting segment(s) get flag 0 and isNew = true, so the
 %   next call to pose_fix(x, y, [], [], seg) re-judges them by the
-%   normal rules (seed if len >= winWidth, otherwise propagation) and
+%   normal rules (seed if len >= seedWidth, otherwise propagation) and
 %   rechecks only the stretch between the nearest original seeds.
 %
 %   Only the standard fields (see pose_seg_build) are kept in sync.

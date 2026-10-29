@@ -3,7 +3,7 @@
 The Pose viewer shows body-part trajectories from DeepLabCut or SLEAP and
 corrects tracking errors. The Gait viewer then uses the corrected paws.
 
-<!-- SCREENSHOT: docs/images/pose-viewer.png. Pose viewer with x/y traces and the correction overlay. -->
+![Pose viewer: x and y traces of a forepaw with step markers and the body-part list](images/pose-viewer.png)
 
 ## Supported files
 
@@ -58,7 +58,7 @@ paw label landing on the other paw for a few frames. **Pose Fix** finds these
 excursions from the trajectory itself and replaces them by interpolation
 through the trustworthy parts.
 
-<!-- SCREENSHOT: docs/images/pose-fix.png. The Pose auto fix window and the correction overlay with seeds, rejected segments and interpolation. -->
+![Pose auto fix window next to the Pose viewer, showing the correction overlay with its legend](images/pose-fix.png)
 
 ### Settings
 

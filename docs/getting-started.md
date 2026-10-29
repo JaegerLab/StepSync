@@ -31,7 +31,7 @@ The optional argument is the folder where file dialogs first open. After that,
 StepSync remembers the folder of the last file you opened or saved. If StepSync 
 windows are already open, running `StepSync` again brings them to the front.
 
-<!-- SCREENSHOT: docs/images/launcher.png. The launcher window with its four buttons. -->
+![The launcher window with its four module buttons](images/launcher.png)
 
 The launcher has one button per module: **Video**, **Ephys**, **Pose**
 and **Gait**. Opening a module closes the launcher. After that, launch other modules 

@@ -3,7 +3,7 @@
 The Ephys viewer reads multichannel recordings and finds the camera trigger.
 Its preprocessing step prepares the signals for the step-triggered average.
 
-<!-- SCREENSHOT: docs/images/ephys-viewer.png. Ephys viewer with a processed channel, the cursor line and step markers. -->
+![Ephys viewer: a processed EMG channel with the cursor line, step markers and the channel list sorted by muscle](images/ephys-viewer.png)
 
 ## Opening a recording
 
@@ -87,6 +87,8 @@ currently selected in the viewer, so steps can be chained (for example, a
 second down-sampling of *Processed 1*). The window shows the settings of the
 selected type: the ones a processed type was made with, or the defaults
 below for `Raw`. Selecting another type also discards the preview.
+
+![Ephys Pre-Process window: high-pass filter, rectify and down-sample to 200 Hz](images/preprocess.png)
 
 | Setting | Default | Description |
 |---|---|---|

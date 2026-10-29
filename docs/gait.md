@@ -5,7 +5,7 @@ or position peaks. A mask restricts the analysis to the periods you choose.
 The events are shown in every viewer and are used by the
 [step-triggered average](sta.md).
 
-<!-- SCREENSHOT: docs/images/gait-viewer.png. Gait viewer showing a speed trace, threshold, masked periods in grey and onset markers. -->
+![Gait viewer: forepaw speed trace with the threshold line, onset markers and the event list](images/gait-viewer.png)
 
 ## Importing paws
 
@@ -96,7 +96,7 @@ searches and peaks never span one. Each masked period is also listed as a
 
 **Edit Mask** opens the mask editor, which has two tabs.
 
-<!-- SCREENSHOT: docs/images/mask-editor.png. Mask editor: speed threshold tab with preview, and manual rules tab. -->
+![Edit Mask window, Speed threshold tab, with speed imported from a file and its preview plot](images/mask-editor.png)
 
 ### Speed threshold
 

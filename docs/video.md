@@ -4,7 +4,7 @@ The Video viewer plays the behaviour video on the shared timeline. It overlays
 the selected pose marker and the detected steps, and exports a copy of the
 video with those markers drawn in.
 
-<!-- SCREENSHOT: docs/images/video-viewer.png. Video viewer with the pose marker (cyan +) and step rings (magenta). -->
+![Video viewer with the pose marker (cyan +) and step rings (magenta)](images/video-viewer.png)
 
 ## Opening a video
 

@@ -4,7 +4,7 @@ The step-triggered average (STA) is the mean ephys signal (for example rectified
 is compared with the average expected by chance, which shows whether a
 muscle's activity is locked to the step cycle.
 
-<!-- SCREENSHOT: docs/images/sta.png. STA window with the average, control mean and 3 SD band. -->
+![Step-Triggered Average window: the STA, control mean and 3 SD null band](images/sta.png)
 
 ## Choosing what to average
 

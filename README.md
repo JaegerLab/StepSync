@@ -4,7 +4,7 @@ StepSync is a MATLAB application for aligning electrophysiology (such as EMG or 
 and markerless pose tracking recorded during locomotion. It detects steps from
 paw trajectories and computes step-triggered averages (STA) of muscle activity.
 
-<!-- SCREENSHOT: docs/images/overview.png. All four viewers open side by side, with step markers visible in each. -->
+![The four StepSync viewers side by side, with step markers in each](docs/images/StepSync.png)
 
 ## Features
 
